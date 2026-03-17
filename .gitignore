@@ -1,3 +1,5 @@
 project1-image-restoration/original_data/
 project1-image-restoration/super-resolution/prepared_data/
+project1-image-restoration/super-resolution/output_data/**/*.png
 .vscode
+__pycache__
