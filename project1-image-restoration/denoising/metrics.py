@@ -20,10 +20,10 @@ def sne(pred: torch.Tensor, target: torch.Tensor) -> float:
 
 def psnr(pred: torch.Tensor, target: torch.Tensor, max_val: float = 1.0) -> float:
     """Peak Signal-to-Noise Ratio — higher is better."""
-    mse = torch.mean((pred - target) ** 2).item()
+    mse = torch.mean((pred - target) ** 2)
     if mse == 0:
         return float("inf")
-    return 10 * torch.log10(torch.tensor(max_val ** 2 / mse)).item()
+    return 10 * torch.log10(max_val**2 / mse).item()
 
 
 def ssim(pred: torch.Tensor, target: torch.Tensor) -> float:
@@ -34,6 +34,7 @@ def ssim(pred: torch.Tensor, target: torch.Tensor) -> float:
 def lpips_score(pred: torch.Tensor, target: torch.Tensor) -> float:
     """Learned Perceptual Image Patch Similarity — lower is better."""
     net = _get_lpips()
+    net.to(pred.device)
     net.eval()
     # lpips expects images in [-1, 1]
     pred_n   = pred   * 2 - 1
