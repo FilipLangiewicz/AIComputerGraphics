@@ -223,3 +223,6 @@ project1-image-restoration/original_data/
 project1-image-restoration/denoising/preprocessed_data/
 project1-image-restoration/super-resolution/prepared_data/
 project1-image-restoration/super-resolution/output_data/**/*.png
+project1-image-restoration/denoising/outputs/
+project1-image-restoration/denoising/preprocessed_data_1/
+project1-image-restoration/denoising/runs/
