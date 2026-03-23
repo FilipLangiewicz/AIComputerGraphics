@@ -125,14 +125,14 @@ Dla każdego patcha zapisano trzy jego wersje:
 * zaszumioną,
 * odszumioną za pomocą filtru bilateralnego.
 
-Zbiór walidacyjny przygotowano analogicznie, zapewniając spójność procesu ewaluacji z warunkami treningowymi.
+Zbiór walidacyjny przygotowano w analogiczny sposób, jednakże zamiast tworzyć 40 losowych patchy, podzielono każdą obserwację na nienachodzące na siebie patche o rozmiarze 256 × 256.
 
 W wyniku powyższego procesu uzyskano następującą liczebność danych:
 
 | Zbiór     | Liczba próbek |
 |-----------|:-------------:|
-| Treningowy   |    32000     |
-| Walidacyjny |     4000      |
+| Treningowy   |     32000     |
+| Walidacyjny |     3598      |
 
 Ze względu na ograniczenia zasobów obliczeniowych podczas właściwego treningu wykorzystano jedynie 10 patchy na każdą obserwację. Dodatkowo zbiór treningowy podzielono na podzbiory treningowy i walidacyjny w proporcji 80/20. Kluczowym aspektem było zapewnienie, że wszystkie patche pochodzące z jednej obserwacji trafiają wyłącznie do jednego podzbioru, co eliminuje ryzyko data leakage i zapewnia wiarygodność wyników.
 
@@ -142,7 +142,7 @@ Ostatecznie w procesie treningu i ewaluacji wykorzystano:
 |-----------|:-------------:|
 | Treningowy   |     6400      |
 | Walidacyjny |     1600      |
-| Treningowy   |     1000      |
+| Treningowy   |     3598      |
 
 ---
 
@@ -155,8 +155,8 @@ Pierwszym etapem przetwarzania jest moduł ekstrakcji cech składający się z p
 Główna część modelu to sekwencja bloków EAM (Enhancement Attention Module). W naszym modelu RIDNet zastosowano 3 takie bloki. Każdy z nich składa się z kilku podkomponentów:
 
 1. **Ekstrakcja cech wieloskalowych (dilated convolutions)** - wykorzystuje konwolucje z dylatacją, aby „widzieć” większy obszar obrazu bez zwiększania liczby parametrów. Dzięki temu model jednocześnie uchwytuje drobne detale (lokalne informacje) oraz szerszy kontekst (globalne informacje).
-2. **Blok residualny (Residual Block)** - uczy się modyfikować wejściowe cechy zamiast tworzyć je od zera. Dzięki połączeniu skip connection: łatwiejszy przepływ gradientu, stabilniejszy trening, lepsze zachowanie informacji wejściowej.
-3. **Ulepszony blok residualny (Enhanced Residual Block)** - rozszerzona wersja bloku residualnego z dodatkowymi warstwami. Pozwala: modelować bardziej złożone zależności, lepiej łączyć i przekształcać cechy, zwiększyć zdolność reprezentacyjną sieci.
+2. **Blok resztkowy (Residual Block)** - uczy się modyfikować wejściowe cechy zamiast tworzyć je od zera. Dzięki połączeniu skip connection: łatwiejszy przepływ gradientu, stabilniejszy trening, lepsze zachowanie informacji wejściowej.
+3. **Ulepszony blok resztkowy (Enhanced Residual Block)** - rozszerzona wersja bloku resztkowego z dodatkowymi warstwami. Pozwala: modelować bardziej złożone zależności, lepiej łączyć i przekształcać cechy, zwiększyć zdolność reprezentacyjną sieci.
 4. **Mechanizm uwagi kanałowej (Channel Attention)** - nadaje wagę poszczególnym kanałom cech: wzmacnia istotne informacje (np. krawędzie) oraz tłumi mniej ważne (np. szum). Dzięki temu model „skupia się” na tym, co najważniejsze dla odszumiania.
 
 Ostatni etap to moduł rekonstrukcji (Reconstruction Module) składający się z pojedynczej warstwy konwolucyjnej. Jej zadaniem jest przekształcenie przetworzonych cech z powrotem do przestrzeni obrazu.
@@ -183,13 +183,13 @@ Trening sieci ustawiono na 15 epok, jednakże najmniejszą wartość funkcji str
 
 ### 2.4 Wyniki
 
-| Metoda                       | PSNR (dB) ↑ |   SSIM ↑   |  LPIPS ↓  |    SNE ↓    |
-|------------------------------|:-----------:|:----------:|:---------:|:-----------:|
-| Pary czysty-zaszumiony obraz |   33.6958   |   0.8504   |  0.1455   |  376.0818   |
-| denoise_bilateral (skimage)  |   33.8053   |   0.9062   |  0.1773   |  382.9705   |
-| RIDNet (nasz model)          | **40.5845** | **0.9733** | **0.089** | **78.5469** |
+| Metoda                       | PSNR (dB) ↑ |   SSIM ↑   |  LPIPS ↓   |   SNE ↓    |
+|------------------------------|:-----------:|:----------:|:----------:|:----------:|
+| Pary czysty-zaszumiony obraz |   33.6471   |   0.8471   |   0.1509   |  378.4478  |
+| denoise_bilateral (skimage)  |   34.0724   |   0.9058   |    0.18    |  381.2101  |
+| RIDNet (nasz model)          | **40.8019** | **0.9731** | **0.0938** | **78.321** |
 
-> Metryki obliczone na zbiorze testowym składającym się z 10 patchy na próbkę ze zbioru walidacyjnego DIV2K (1000 patchy 256×256).  
+> Metryki obliczone na pełnym zbiorze testowym DIV2K (3598 patchy 256×256).  
 > Wartości `inf` na potrzeby obliczenia metryki PSNR zastąpiono wartością 42 przed uśrednieniem.
 
 ---
@@ -202,14 +202,14 @@ Trening sieci ustawiono na 15 epok, jednakże najmniejszą wartość funkcji str
 
 Przede wszystkim widać, że RIDNet skuteczniej usuwa szum, szczególnie przy wyższych poziomach zakłóceń (`σ = 0.03`). Obrazy po przejściu przez model są wyraźnie gładsze, a jednocześnie zachowują istotne struktury, takie jak krawędzie czy tekstury.
 
-Z kolei filtr bilateralny, choć również usuwa szum, działa bardziej lokalnie i opiera się na prostych zależnościach między pikselami. W efekcie: dobrze wygładza jednolite obszary, częściowo zachowuje krawędzie, ale często prowadzi do utraty drobnych detali i tekstur, wyniku czego obrazy są rozmyte.
+Z kolei filtr bilateralny, choć również usuwa szum, działa bardziej lokalnie i opiera się na prostych zależnościach między pikselami. W efekcie: dobrze wygładza jednolite obszary, częściowo zachowuje krawędzie, ale często prowadzi do utraty drobnych detali i tekstur, w wyniku czego obrazy są rozmyte.
 
 ---
 
 ### 2.6 Wnioski
 
-- RIDNet znacząco przewyższa metodę `bilateral_denoise` pod względem jakości rekonstrukcji. Wartość PSNR równa 40.58 dB wskazuje na bardzo dobrą zgodność z obrazem referencyjnym, co oznacza skuteczne usunięcie szumu przy minimalnej utracie informacji.
-- RIDNet osiąga również najlepsze wyniki w metrykach percepcyjnych. Wysokie SSIM (0.9733) potwierdza, że struktura obrazu jest bardzo dobrze zachowana, natomiast najniższa wartość LPIPS (0.089) wskazuje na największe podobieństwo wizualne do obrazu oryginalnego.
+- RIDNet znacząco przewyższa metodę `bilateral_denoise` pod względem jakości rekonstrukcji. Wartość PSNR równa 40.8091 dB wskazuje na bardzo dobrą zgodność z obrazem referencyjnym, co oznacza skuteczne usunięcie szumu przy minimalnej utracie informacji.
+- RIDNet osiąga również najlepsze wyniki w metrykach percepcyjnych. Wysokie SSIM (0.9731) potwierdza, że struktura obrazu jest bardzo dobrze zachowana, natomiast najniższa wartość LPIPS (0.0938) wskazuje na największe podobieństwo wizualne do obrazu oryginalnego.
 - Filtr bilateralny poprawia strukturę obrazu, ale kosztem jakości percepcyjnej. W porównaniu do obrazu zaszumionego, metoda ta zwiększa SSIM, jednak pogarsza LPIPS i SNE, co sugeruje nadmierne wygładzanie i utratę detali.
 - RIDNet oferuje lepszy kompromis między redukcją szumu a zachowaniem detali, zaś filtr bilateralny jest prostszy i szybszy, ale mniej precyzyjny i bardziej podatny na utratę szczegółów.
 
