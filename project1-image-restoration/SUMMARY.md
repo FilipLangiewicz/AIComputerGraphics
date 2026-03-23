@@ -112,4 +112,105 @@ W tym przypadku sieć również poprawiła rozdzielczość zdjęć lepiej niż b
 ## 2. Odszumianie (Denoising)
 Autor: Dominika Boguszewska
 
+### 2.1 Przygotowanie danych
+
+Każdą obserwację ze zbioru treningowego DIV2K wczytano, a następnie poddano normalizacji do zakresu [0,1], co zapewnia stabilność procesu uczenia i ułatwia optymalizację modelu.
+
+Z każdej próbki wygenerowano 40 losowych patchy o rozmiarze 256 × 256. Takie podejście zwiększa różnorodność danych treningowych oraz pozwala modelowi lepiej uogólniać wzorce lokalne. Każdy patch podlegał augmentacji danych: z prawdopodobieństwem 50% był losowo odbijany w pionie oraz z prawdopodobieństwem 50% był losowo odbijany w poziomie, co dodatkowo zwiększało wariancję zbioru bez potrzeby pozyskiwania nowych danych.
+
+Do tak przygotowanych patchy dodawano szum gaussowski o losowo wybranym odchyleniu standardowym `σ ∈ {0.01, 0.03}`, symulując różne poziomy degradacji obrazu. Następnie zaszumione obrazy poddawano procesowi odszumiania z wykorzystaniem filtru bilateralnego (`bilateral_denoise`), który skutecznie redukuje szum przy jednoczesnym zachowaniu krawędzi i istotnych struktur obrazu.
+
+Dla każdego patcha zapisano trzy jego wersje:
+* oryginalną (ground truth),
+* zaszumioną,
+* odszumioną za pomocą filtru bilateralnego.
+
+Zbiór walidacyjny przygotowano analogicznie, zapewniając spójność procesu ewaluacji z warunkami treningowymi.
+
+W wyniku powyższego procesu uzyskano następującą liczebność danych:
+
+| Zbiór     | Liczba próbek |
+|-----------|:-------------:|
+| Treningowy   |    32000     |
+| Walidacyjny |     4000      |
+
+Ze względu na ograniczenia zasobów obliczeniowych podczas właściwego treningu wykorzystano jedynie 10 patchy na każdą obserwację. Dodatkowo zbiór treningowy podzielono na podzbiory treningowy i walidacyjny w proporcji 80/20. Kluczowym aspektem było zapewnienie, że wszystkie patche pochodzące z jednej obserwacji trafiają wyłącznie do jednego podzbioru, co eliminuje ryzyko data leakage i zapewnia wiarygodność wyników.
+
+Ostatecznie w procesie treningu i ewaluacji wykorzystano:
+
+| Zbiór     | Liczba próbek |
+|-----------|:-------------:|
+| Treningowy   |     6400      |
+| Walidacyjny |     1600      |
+| Treningowy   |     1000      |
+
+---
+
+### 2.2 Architektura - RIDNet
+
+Model RIDNet (Residual Image Denoising Network) został zaprojektowany do usuwania szumu z obrazów poprzez efektywne łączenie mechanizmów residual learning oraz attention. Architektura składa się z trzech głównych komponentów: ekstrakcji cech, głębokiego przetwarzania (EAM) oraz rekonstrukcji obrazu.
+
+Pierwszym etapem przetwarzania jest moduł ekstrakcji cech składający się z pojedynczej warstwy konwolucyjnej. Celem tej warstwy jest przekształcenie obrazu wejściowego do przestrzeni cech o większej liczbie kanałów, co umożliwia dalsze, bardziej złożone operacje. Jest to stosunkowo płytki etap, którego zadaniem jest jedynie wstępna reprezentacja danych.
+
+Główna część modelu to sekwencja bloków EAM (Enhancement Attention Module). W naszym modelu RIDNet zastosowano 3 takie bloki. Każdy z nich składa się z kilku podkomponentów:
+
+1. **Ekstrakcja cech wieloskalowych (dilated convolutions)** - wykorzystuje konwolucje z dylatacją, aby „widzieć” większy obszar obrazu bez zwiększania liczby parametrów. Dzięki temu model jednocześnie uchwytuje drobne detale (lokalne informacje) oraz szerszy kontekst (globalne informacje).
+2. **Blok residualny (Residual Block)** - uczy się modyfikować wejściowe cechy zamiast tworzyć je od zera. Dzięki połączeniu skip connection: łatwiejszy przepływ gradientu, stabilniejszy trening, lepsze zachowanie informacji wejściowej.
+3. **Ulepszony blok residualny (Enhanced Residual Block)** - rozszerzona wersja bloku residualnego z dodatkowymi warstwami. Pozwala: modelować bardziej złożone zależności, lepiej łączyć i przekształcać cechy, zwiększyć zdolność reprezentacyjną sieci.
+4. **Mechanizm uwagi kanałowej (Channel Attention)** - nadaje wagę poszczególnym kanałom cech: wzmacnia istotne informacje (np. krawędzie) oraz tłumi mniej ważne (np. szum). Dzięki temu model „skupia się” na tym, co najważniejsze dla odszumiania.
+
+Ostatni etap to moduł rekonstrukcji (Reconstruction Module) składający się z pojedynczej warstwy konwolucyjnej. Jej zadaniem jest przekształcenie przetworzonych cech z powrotem do przestrzeni obrazu.
+
+---
+
+### 2.3 Trening
+
+| Parametr       |         RIDNet         |
+|----------------|:----------------------:|
+| Epoki          |           15           |
+| Batch size     |           4            |
+| Optymalizator  |          Adam          |
+| LR startowe    |          1e-3          |
+| Scheduler      | StepLR (step=5, γ=0.5) |
+| Funkcja straty |        MSE Loss        |
+| Walidacja co   |        1 epokę         |
+| Checkpoint     |   min loss on valid    |
+| Early stopping |           3            |
+
+Trening sieci ustawiono na 15 epok, jednakże najmniejszą wartość funkcji straty na zbiorze walidacyjnym oraz najlepszy wynik metryki PSNR dla zbioru walidacyjnego uzyskano po 13 epoce.
+
+---
+
+### 2.4 Wyniki
+
+| Metoda                       | PSNR (dB) ↑ |   SSIM ↑   |  LPIPS ↓  |    SNE ↓    |
+|------------------------------|:-----------:|:----------:|:---------:|:-----------:|
+| Pary czysty-zaszumiony obraz |   33.6958   |   0.8504   |  0.1455   |  376.0818   |
+| denoise_bilateral (skimage)  |   33.8053   |   0.9062   |  0.1773   |  382.9705   |
+| RIDNet (nasz model)          | **40.5845** | **0.9733** | **0.089** | **78.5469** |
+
+> Metryki obliczone na zbiorze testowym składającym się z 10 patchy na próbkę ze zbioru walidacyjnego DIV2K (1000 patchy 256×256).  
+> Wartości `inf` na potrzeby obliczenia metryki PSNR zastąpiono wartością 42 przed uśrednieniem.
+
+---
+
+### 2.5 Porównanie wizualne
+
+*Od lewej: Czysty obraz, Zaszumiony obraz, Wyjście RIDNet, Wyjście denoise_bilateral*
+
+![Porównanie metod odszumiania](figures/denoising_comparison.png)
+
+Przede wszystkim widać, że RIDNet skuteczniej usuwa szum, szczególnie przy wyższych poziomach zakłóceń (`σ = 0.03`). Obrazy po przejściu przez model są wyraźnie gładsze, a jednocześnie zachowują istotne struktury, takie jak krawędzie czy tekstury.
+
+Z kolei filtr bilateralny, choć również usuwa szum, działa bardziej lokalnie i opiera się na prostych zależnościach między pikselami. W efekcie: dobrze wygładza jednolite obszary, częściowo zachowuje krawędzie, ale często prowadzi do utraty drobnych detali i tekstur, wyniku czego obrazy są rozmyte.
+
+---
+
+### 2.6 Wnioski
+
+- RIDNet znacząco przewyższa metodę `bilateral_denoise` pod względem jakości rekonstrukcji. Wartość PSNR równa 40.58 dB wskazuje na bardzo dobrą zgodność z obrazem referencyjnym, co oznacza skuteczne usunięcie szumu przy minimalnej utracie informacji.
+- RIDNet osiąga również najlepsze wyniki w metrykach percepcyjnych. Wysokie SSIM (0.9733) potwierdza, że struktura obrazu jest bardzo dobrze zachowana, natomiast najniższa wartość LPIPS (0.089) wskazuje na największe podobieństwo wizualne do obrazu oryginalnego.
+- Filtr bilateralny poprawia strukturę obrazu, ale kosztem jakości percepcyjnej. W porównaniu do obrazu zaszumionego, metoda ta zwiększa SSIM, jednak pogarsza LPIPS i SNE, co sugeruje nadmierne wygładzanie i utratę detali.
+- RIDNet oferuje lepszy kompromis między redukcją szumu a zachowaniem detali, zaś filtr bilateralny jest prostszy i szybszy, ale mniej precyzyjny i bardziej podatny na utratę szczegółów.
+
 ---
