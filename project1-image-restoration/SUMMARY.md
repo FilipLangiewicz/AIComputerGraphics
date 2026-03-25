@@ -142,7 +142,7 @@ Ostatecznie w procesie treningu i ewaluacji wykorzystano:
 |-----------|:-------------:|
 | Treningowy   |     6400      |
 | Walidacyjny |     1600      |
-| Treningowy   |     3598      |
+| Testowy   |     3598      |
 
 ---
 
