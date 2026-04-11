@@ -108,10 +108,16 @@ def train(
 
         avg_loss = total_loss / len(train_loader)
         postfix  = {"loss": f"{avg_loss:.4f}"}
+        
+        current_lr = optimizer.param_groups[0]["lr"]
+        print(f"Epoch {epoch:03d}/{epochs}  loss={avg_loss:.4f}  lr={current_lr:.2e}", flush=True)
 
         if epoch % eval_every == 0 or epoch == epochs:
             avg_psnr = evaluate(model, test_loader, device)
             postfix["PSNR"] = f"{avg_psnr:.2f}dB"
+            
+            print(f"  └─ eval  PSNR={avg_psnr:.2f}dB  (best={best_psnr:.2f}dB)", flush=True)
+
 
             if scheduler and scheduler_name == "plateau":
                 scheduler.step(avg_psnr)
@@ -125,7 +131,7 @@ def train(
                     "psnr":     best_psnr,
                     "features": features,
                 }, save_path)
-                postfix["saved"] = "✓"
+                postfix["saved"] = "True"
 
         elif scheduler and scheduler_name == "cosine":
             scheduler.step()
