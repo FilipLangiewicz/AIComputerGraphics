@@ -116,8 +116,13 @@ def train(
             avg_psnr = evaluate(model, test_loader, device)
             postfix["PSNR"] = f"{avg_psnr:.2f}dB"
             
-            print(f"  └─ eval  PSNR={avg_psnr:.2f}dB  (best={best_psnr:.2f}dB)", flush=True)
-
+            torch.save({
+                "epoch":    epoch,
+                "model":    model.state_dict(),
+                "optim":    optimizer.state_dict(),
+                "psnr":     avg_psnr,
+                "features": features,
+            }, save_path.with_stem(save_path.stem + f"_ep{epoch:03d}"))
 
             if scheduler and scheduler_name == "plateau":
                 scheduler.step(avg_psnr)
@@ -132,8 +137,12 @@ def train(
                     "features": features,
                 }, save_path)
                 postfix["saved"] = "True"
+                print(f"  └─ saved best checkpoint", flush=True)
+                
+            print(f"  └─ eval  PSNR={avg_psnr:.2f}dB  (best={best_psnr:.2f}dB)", flush=True)
 
-        elif scheduler and scheduler_name == "cosine":
+
+        if scheduler and scheduler_name == "cosine":
             scheduler.step()
 
         epoch_bar.set_postfix(postfix)
