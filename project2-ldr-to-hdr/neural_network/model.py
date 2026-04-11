@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 
 class ResBlock(nn.Module):
@@ -43,9 +44,12 @@ class DecoderBlock(nn.Module):
 
         self.shortcut = nn.Conv2d(out_channels + skip_channels, out_channels, kernel_size=1, bias=False)
 
-    def forward(self, x: torch.Tensor, skip: torch.Tensor) -> torch.Tensor:
-        x   = self.up(x)
-        x   = torch.cat([x, skip], dim=1)
+    def forward(self, x, skip):
+        x = self.up(x)
+        if x.shape[2:] != skip.shape[2:]:
+            x = F.pad(x, [0, skip.shape[3] - x.shape[3],
+                        0, skip.shape[2] - x.shape[2]])
+        x = torch.cat([x, skip], dim=1)
         out = self.conv(x)
         out = self.res(out) + self.shortcut(x)
         return out
