@@ -229,3 +229,4 @@ project1-image-restoration/denoising/runs/
 
 project2-ldr-to-hdr/data/images/
 project2-ldr-to-hdr/neural_network/nn_data/patches/
+project2-ldr-to-hdr/neural_network/models/
