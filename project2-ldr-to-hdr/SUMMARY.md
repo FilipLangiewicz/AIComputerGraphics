@@ -185,7 +185,69 @@ lepiej uchwycić globalne zależności jasności w obrazie.
 
 ---
 
-## Algorytmy
+## Rekonstrukcja HDR
+
 Autor: Dominika Boguszewska
 
+### Algorytm Debeveca
+
+Zaimplementowano funkcję `debevec_algorithm`, która przyjmuje listę obrazów, składającą się z obrazu LDR oraz uzyskanych obrazów *underexposed* i *overexposed*, oraz odpowiadające im czasy naświetlenia w sekundach. Funkcja najpierw kalibruje krzywą odpowiedzi kamery (`CalibrateDebevec`), a następnie scala obrazy w jeden obraz HDR (`MergeDebevec`) przy użyciu biblioteki `OpenCV`.
+
 ---
+
+### Wyznaczanie czasów naświetlenia
+
+Algorytm Debeveca wymaga rzeczywistych czasów naświetlenia wyrażonych w sekundach, a nie względnych przesunięć ekspozycji w stopniach EV. Z tego powodu konieczne było odnalezienie bazowego czasu naświetlenia
+
+#### Bazowy czas naświetlenia
+
+Ponieważ obrazy LDR w formacie `.tif` nie zawierają metadanych EXIF, zaimplementowano funkcję `find_base_exposure`, która wyznacza bazowy czas naświetlenia poprzez porównanie średniej luminancji obrazu LDR z luminancją każdego zdjęcia z serii bracket. Zdjęcie bracketowe o najzbliżonej luminancji do obrazu LDR jest traktowane jako odpowiednik oryginalnej ekspozycji, a jego czas naświetlenia odczytany z EXIF jest używany jako `t_base`.
+
+#### Czasy naświetlenia dla obrazów wygenerowanych przez sieć
+
+Na podstawie wyznaczonego `t_base` obliczono czasy naświetlenia dla obrazów wygenerowanych przez sieć neuronową:
+
+niedoświetlony: `t_under` = `t_base` × 2^(−2.7)
+prześwietlony: `t_over` = `t_base` × 2^(2.7)
+
+---
+
+### Pipeline rekonstrukcji HDR
+
+Dla każdej sceny testowej (C40–C46) wykonano następujące kroki:
+
+- wczytano trzy obrazy: niedoświetlony i prześwietlony (wygenerowane przez sieć neuronową) oraz oryginalny obraz LDR,
+- przekazano je do algorytmu Debeveca wraz z odpowiadającymi im czasami naświetlenia,
+- zapisano zrekonstruowany obraz HDR do pliku `.hdr`,
+- wykonano tone mapping operatorem Reinharda i zapisano podgląd w formacie `.png`,
+- dokonano pomiaru zakresu dynamicznego.
+
+---
+
+### Pomiar zakresu dynamicznego
+
+Dla każdej sceny zmierzono zakres dynamiczny (w stopniach EV) zarówno zrekonstruowanego obrazu HDR, jak i oryginalnego obrazu HDR z datasetu, korzystając z funkcji `measure_ev_range`.
+
+| Obraz | Dynamic Range Original | Dynamic Range New |
+|-------|------------------------|-------------------|
+| C40 | 20.267975 | 6.221790 |
+| C41 | 17.996151 | 6.580147 |
+| C42 | 8.178262 | 6.935391 |
+| C43 | 24.301859 | 7.583825 |
+| C44 | 7.169200 | 5.776097 |
+| C45 | 8.394124 | 7.449384 |
+| C46 | 14.071410 | 6.992755 |
+
+Zrekonstruowane obrazy HDR osiągają zakres dynamiczny w przedziale od około 5.8 EV (C44) do 7.6 EV (C43), podczas gdy oryginalne obrazy HDR charakteryzują się znacznie wyższymi wartościami — od 7.2 EV (C44) aż do 24.3 EV (C43). Warto zauważyć, że sceny C42, C44 i C45 mają stosunkowo niski zakres dynamiczny również w oryginale (odpowiednio 8.2, 7.2 i 8.4 EV), a zrekonstruowane obrazy dla tych scen są najbliższe oryginałowi — różnica wynosi mniej niż 2 EV. Natomiast dla scen o bardzo wysokim oryginalnym zakresie dynamicznym, takich jak C40 (20.3 EV) czy C43 (24.3 EV), różnica jest drastyczna i sięga ponad 16 EV.
+
+---
+
+### Wizualizacja wyników
+
+![HDR_Reconstruction_Output](hdr_reconstruction_output/hdr_previews.png)
+
+---
+
+### Wnioski
+
+Tak duża rozbieżność między oryginałem a rekonstrukcją wynika z fundamentalnego ograniczenia zastosowanego podejścia. Sieć neuronowa generuje jedynie dwie dodatkowe ekspozycje o przesunięciu ±2.7 EV względem obrazu oryginalnego, co daje łączny zakres zaledwie 5.4 EV do scalenia algorytmem Debeveca. Oryginalne obrazy HDR w datasecie zostały natomiast zbudowane z wielu zdjęć bracketowych obejmujących znacznie szerszy zakres ekspozycji, co pozwoliło uchwycić zarówno bardzo ciemne, jak i bardzo jasne obszary sceny.
