@@ -7,12 +7,12 @@ class ResBlock(nn.Module):
     def __init__(self, channels: int):
         super().__init__()
         self.block = nn.Sequential(
-            nn.BatchNorm2d(channels),
+            nn.InstanceNorm2d(channels, affine=True),
             nn.ReLU(inplace=True),
-            nn.Conv2d(channels, channels, kernel_size=3, padding=1, bias=False),
-            nn.BatchNorm2d(channels),
+            nn.Conv2d(channels, channels, 3, padding=1, bias=False),
+            nn.InstanceNorm2d(channels, affine=True),
             nn.ReLU(inplace=True),
-            nn.Conv2d(channels, channels, kernel_size=3, padding=1, bias=False),
+            nn.Conv2d(channels, channels, 3, padding=1, bias=False),
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -38,7 +38,10 @@ class EncoderBlock(nn.Module):
 class DecoderBlock(nn.Module):
     def __init__(self, in_channels: int, skip_channels: int, out_channels: int):
         super().__init__()
-        self.up   = nn.ConvTranspose2d(in_channels, out_channels, kernel_size=2, stride=2)
+        self.up = nn.Sequential(
+            nn.Upsample(scale_factor=2, mode='bilinear', align_corners=False),
+            nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1, bias=False),
+        )
         self.conv = nn.Conv2d(out_channels + skip_channels, out_channels, kernel_size=3, padding=1, bias=False)
         self.res  = ResBlock(out_channels)
 
@@ -77,12 +80,11 @@ class ResUNet(nn.Module):
             self.decoders.append(DecoderBlock(ch, f, f))
             ch = f
 
-        self.head = nn.Sequential(
-            nn.Conv2d(ch, out_channels, kernel_size=1),
-            nn.Sigmoid(),
-        )
+        self.head = nn.Conv2d(ch, out_channels, kernel_size=1)  # bez Sigmoid!
+
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        inp = x                          # zapamiętaj wejście
         skips = []
         for encoder in self.encoders:
             x, skip = encoder(x)
@@ -93,4 +95,5 @@ class ResUNet(nn.Module):
         for decoder, skip in zip(self.decoders, reversed(skips)):
             x = decoder(x, skip)
 
-        return self.head(x)
+        residual = self.head(x)          # głowa bez Sigmoid — surowy residual
+        return torch.clamp(inp + residual, 0.0, 1.0)   # input + delta

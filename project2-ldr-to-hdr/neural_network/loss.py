@@ -41,16 +41,26 @@ class SSIMLoss(nn.Module):
 
         ssim_map = numerator / denominator
         return 1 - ssim_map.mean()
+    
+class GradientLoss(nn.Module):
+    def forward(self, pred, target):
+        def grad(x):
+            dx = x[:, :, :, 1:] - x[:, :, :, :-1]
+            dy = x[:, :, 1:, :] - x[:, :, :-1, :]
+            return dx, dy
+        dx_p, dy_p = grad(pred)
+        dx_t, dy_t = grad(target)
+        return F.l1_loss(dx_p, dx_t) + F.l1_loss(dy_p, dy_t)
 
 
 class ExposureLoss(nn.Module):
-    def __init__(self, alpha: float = 0.8):
+    def __init__(self, alpha=0.85, beta=0.10):
         super().__init__()
-        self.alpha    = alpha
-        self.l1       = nn.L1Loss()
-        self.ssim     = SSIMLoss()
+        self.alpha = alpha   # L1
+        self.beta  = beta    # gradient
+        self.l1   = nn.L1Loss()
+        self.grad = GradientLoss()
 
-    def forward(self, pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
-        l1_loss   = self.l1(pred, target)
-        ssim_loss = self.ssim(pred, target)
-        return self.alpha * l1_loss + (1 - self.alpha) * ssim_loss
+    def forward(self, pred, target):
+        return self.alpha * self.l1(pred, target) \
+             + self.beta  * self.grad(pred, target)
