@@ -181,6 +181,8 @@ lepiej uchwycić globalne zależności jasności w obrazie.
 | underexposed | 19.66 dB | 0.3729 |
 | overexposed  | 19.00 dB | 0.5608 |
 
+![NNOutput](assets/nnoutput.png)
+
 ---
 
 ## Algorytmy
