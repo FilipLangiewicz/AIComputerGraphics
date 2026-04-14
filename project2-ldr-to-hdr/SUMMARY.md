@@ -201,7 +201,7 @@ Algorytm Debeveca wymaga rzeczywistych czasów naświetlenia wyrażonych w sekun
 
 #### Bazowy czas naświetlenia
 
-Ponieważ obrazy LDR w formacie `.tif` nie zawierają metadanych EXIF, zaimplementowano funkcję `find_base_exposure`, która wyznacza bazowy czas naświetlenia poprzez porównanie średniej luminancji obrazu LDR z luminancją każdego zdjęcia z serii bracket. Zdjęcie bracketowe o najzbliżonej luminancji do obrazu LDR jest traktowane jako odpowiednik oryginalnej ekspozycji, a jego czas naświetlenia odczytany z EXIF jest używany jako `t_base`.
+Ponieważ obrazy LDR w formacie `.tif` nie zawierają metadanych EXIF, zaimplementowano funkcję `find_base_exposure`, która wyznacza bazowy czas naświetlenia poprzez porównanie średniej luminancji obrazu LDR z luminancją każdego zdjęcia z serii bracket. Zdjęcie bracketowe o najbardziej zbliżonej luminancji do obrazu LDR jest traktowane jako odpowiednik oryginalnej ekspozycji, a jego czas naświetlenia odczytany z EXIF jest używany jako `t_base`.
 
 #### Czasy naświetlenia dla obrazów wygenerowanych przez sieć
 
