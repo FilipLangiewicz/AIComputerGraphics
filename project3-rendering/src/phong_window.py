@@ -89,6 +89,6 @@ class PhongWindow(BaseWindow):
             }
 
             with open(params_output_path / f'{self.frame:04}.json', 'w') as f:
-                json.dump(params, f)
+                json.dump(params, f, indent=4)
 
             self.frame += 1
