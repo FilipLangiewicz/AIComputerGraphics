@@ -1,9 +1,14 @@
 import os.path
 
 import moderngl
+import random
+import json
+
 import numpy as np
+
 from PIL import Image
 from pyrr import Matrix44
+from pathlib import Path
 
 from base_window import BaseWindow
 
@@ -23,14 +28,18 @@ class PhongWindow(BaseWindow):
         self.camera_position = self.program["camera_position"]
 
     def on_render(self, time: float, frame_time: float):
+        if self.frame >= 3000:
+            self.wnd.close()
+            return
+
         self.ctx.clear(0.0, 0.0, 0.0, 0.0)
         self.ctx.enable(moderngl.DEPTH_TEST | moderngl.CULL_FACE)
 
-        # todo: Randomize
-        model_translation = [5.0, 0.0, 0.0]
-        material_diffuse = [1.0, 0.0, 0.0]
-        material_shininess = 5
-        light_position = [15.0, 5.0, 0.0]
+        # Losowanie parametrów sceny
+        model_translation = [random.uniform(-20, 20) for _ in range(3)]
+        material_diffuse = [random.uniform(0, 255) / 255.0 for _ in range(3)]
+        material_shininess = random.uniform(3, 20)
+        light_position = [random.uniform(-20, 20) for _ in range(3)]
 
         camera_position = [5.0, 5.0, 15.0]
         model_matrix = Matrix44.from_translation(model_translation)
@@ -51,10 +60,35 @@ class PhongWindow(BaseWindow):
         self.camera_position.write(np.array(camera_position, dtype='f4').tobytes())
 
         self.vao.render()
+
         if self.output_path:
             img = (
                 Image.frombuffer('RGBA', self.wnd.size, self.wnd.fbo.read(components=4))
                      .transpose(Image.Transpose.FLIP_TOP_BOTTOM)
             )
-            img.save(os.path.join(self.output_path, f'image_{self.frame:04}.png'))
+
+            # Pomiń obrazy zbyt ciemne
+            img_array = np.array(img)
+
+            if img_array[..., :3].sum() < 1000:
+                return
+
+            images_output_path = Path(os.path.join(self.output_path, 'images'))
+            images_output_path.mkdir(parents=True, exist_ok=True)
+
+            img.save(images_output_path / f'image_{self.frame:04}.png')
+
+            params_output_path = Path(os.path.join(self.output_path, 'params'))
+            params_output_path.mkdir(parents=True, exist_ok=True)
+
+            params = {
+                "model_translation": model_translation,
+                "material_diffuse": material_diffuse,
+                "material_shininess": material_shininess,
+                "light_position": light_position,
+            }
+
+            with open(params_output_path / f'{self.frame:04}.json', 'w') as f:
+                json.dump(params, f, indent=4)
+
             self.frame += 1
