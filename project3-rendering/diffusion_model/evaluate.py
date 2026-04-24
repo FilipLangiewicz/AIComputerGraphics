@@ -16,13 +16,13 @@ from ddpm import DDPM
 from unet import UNet
 
 
-def compute_val_metrics(model: UNet, ddpm: DDPM, val_loader: DataLoader, device: str, num_samples: int = 32) -> dict[str, float]:
+def compute_metrics(model: UNet, ddpm: DDPM, loader: DataLoader, device: str, num_samples: int = 32) -> dict[str, float]:
     lpips_fn = lpips.LPIPS(net='alex').to(device)
     results = {"ssim": [], "lpips": [], "hausdorff": []}
     sample_count = 0
 
     with torch.no_grad():
-        for params, real_images in tqdm(val_loader, desc="Val metrics", leave=False, total=len(val_loader)):
+        for params, real_images in tqdm(loader, desc="Metrics", leave=False, total=num_samples):
             params = params.to(device)
             real_images = real_images.to(device)
             B = params.size(0)
@@ -62,7 +62,7 @@ def evaluate(model: UNet, ddpm: DDPM, test_loader: DataLoader, device: str, outp
     results = {"ssim": [], "lpips": [], "hausdorff": []}
     sample_count = 0
 
-    for params, real_images in tqdm(test_loader, desc="Evaluating", leave=False, total=len(test_loader)):
+    for params, real_images in tqdm(test_loader, desc="Evaluating", leave=False, total=num_samples):
         params = params.to(device)
         real_images = real_images.to(device)
 
