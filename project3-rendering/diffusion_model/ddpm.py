@@ -1,7 +1,5 @@
 import torch
 from unet import UNet
-from tqdm import tqdm
-
 
 class DDPM:
     def __init__(self, T: int = 200, beta_start: float = 1e-4, beta_end: float = 0.02, device: str = "cuda"):
@@ -32,7 +30,7 @@ class DDPM:
 
         model.eval()
 
-        for t_val in tqdm(reversed(range(self.T)), desc="Sampling", leave=False, total=self.T):
+        for t_val in reversed(range(self.T)):
             t = torch.full((shape[0],), t_val, device=self.device, dtype=torch.long)
             pred_noise = model(x, t, cond)
 

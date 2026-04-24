@@ -16,6 +16,39 @@ from ddpm import DDPM
 from unet import UNet
 
 
+def compute_val_metrics(model: UNet, ddpm: DDPM, val_loader: DataLoader, device: str, num_samples: int = 32) -> dict[str, float]:
+    lpips_fn = lpips.LPIPS(net='alex').to(device)
+    results = {"ssim": [], "lpips": [], "hausdorff": []}
+    sample_count = 0
+
+    with torch.no_grad():
+        for params, real_images in tqdm(val_loader, desc="Val metrics", leave=False, total=len(val_loader)):
+            params = params.to(device)
+            real_images = real_images.to(device)
+            B = params.size(0)
+
+            generated_images = ddpm.p_sample_loop(model, params, (B, 3, 128, 128))
+
+            lp = lpips_fn(generated_images.clamp(-1, 1), real_images.clamp(-1, 1))
+            results["lpips"].extend(lp.squeeze().cpu().tolist() if lp.numel() > 1 else [lp.item()])
+
+            for i in range(B):
+                ref_np = tensor_to_np(real_images[i])
+                gen_np = tensor_to_np(generated_images[i])
+                results["ssim"].append(ssim(ref_np, gen_np, data_range=1.0, channel_axis=2))
+                results["hausdorff"].append(compute_hausdorff(ref_np, gen_np))
+                sample_count += 1
+
+            if sample_count >= num_samples:
+                break
+
+    return {
+        "ssim": float(np.nanmean(results["ssim"])),
+        "lpips": float(np.nanmean(results["lpips"])),
+        "hausdorff": float(np.nanmean([x for x in results["hausdorff"] if not np.isnan(x)])),
+    }
+
+
 def evaluate(model: UNet, ddpm: DDPM, test_loader: DataLoader, device: str, output_dir: Path, num_samples: int = 600, offset: int = 2400):
     generated_images_dir = output_dir / "generated_images"
     side_by_side_dir = output_dir / "side_by_side"
@@ -29,7 +62,7 @@ def evaluate(model: UNet, ddpm: DDPM, test_loader: DataLoader, device: str, outp
     results = {"ssim": [], "lpips": [], "hausdorff": []}
     sample_count = 0
 
-    for params, real_images in tqdm(test_loader, desc="Evaluating"):
+    for params, real_images in tqdm(test_loader, desc="Evaluating", leave=False, total=len(test_loader)):
         params = params.to(device)
         real_images = real_images.to(device)
 
