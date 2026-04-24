@@ -12,8 +12,8 @@ from skimage.metrics import structural_similarity as ssim
 from torch.utils.data import DataLoader
 from torchvision.utils import save_image
 
-from diffusison_model.ddpm import DDPM
-from diffusison_model.unet import UNet
+from ddpm import DDPM
+from unet import UNet
 
 
 def evaluate(model: UNet, ddpm: DDPM, test_loader: DataLoader, device: str, output_dir: Path, num_samples: int = 600, offset: int = 2400):

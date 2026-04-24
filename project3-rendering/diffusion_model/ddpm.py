@@ -1,5 +1,5 @@
 import torch
-from diffusison_model.unet import UNet
+from unet import UNet
 from tqdm import tqdm
 
 
