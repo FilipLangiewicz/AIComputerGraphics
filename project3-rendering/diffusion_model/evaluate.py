@@ -16,7 +16,25 @@ from ddpm import DDPM
 from unet import UNet
 
 
-def compute_metrics(model: UNet, ddpm: DDPM, loader: DataLoader, device: str, num_samples: int = 32) -> dict[str, float]:
+def compute_metrics(
+        model: UNet,
+        ddpm: DDPM,
+        loader: DataLoader,
+        device: str,
+        num_samples: int = 32,
+        save_images: bool = False,
+        output_dir: Path = Path("outputs"),
+        offset: int = 2400
+) -> dict[str, float]:
+
+    if save_images:
+        generated_images_dir = output_dir / "generated_images"
+        side_by_side_dir = output_dir / "side_by_side"
+
+        output_dir.mkdir(exist_ok=True, parents=True)
+        generated_images_dir.mkdir(exist_ok=True, parents=True)
+        side_by_side_dir.mkdir(exist_ok=True, parents=True)
+
     lpips_fn = lpips.LPIPS(net='alex').to(device)
     results = {"ssim": [], "lpips": [], "hausdorff": []}
     sample_count = 0
@@ -25,6 +43,7 @@ def compute_metrics(model: UNet, ddpm: DDPM, loader: DataLoader, device: str, nu
         for params, real_images in tqdm(loader, desc="Metrics", leave=False, total=num_samples):
             params = params.to(device)
             real_images = real_images.to(device)
+
             B = params.size(0)
 
             generated_images = ddpm.p_sample_loop(model, params, (B, 3, 128, 128))
@@ -35,75 +54,26 @@ def compute_metrics(model: UNet, ddpm: DDPM, loader: DataLoader, device: str, nu
             for i in range(B):
                 ref_np = tensor_to_np(real_images[i])
                 gen_np = tensor_to_np(generated_images[i])
+
                 results["ssim"].append(ssim(ref_np, gen_np, data_range=1.0, channel_axis=2))
                 results["hausdorff"].append(compute_hausdorff(ref_np, gen_np))
+
+                if save_images:
+                    save_image(generated_images[i].clamp(-1, 1), generated_images_dir / f"image_{sample_count + offset:03d}.png")
+
+                    side_by_side = torch.cat([real_images[i], generated_images[i].clamp(-1, 1)], dim=2)
+                    save_image((side_by_side + 1) / 2, side_by_side_dir / f"image_{sample_count + offset:03d}.png")
+
                 sample_count += 1
 
             if sample_count >= num_samples:
                 break
 
     return {
-        "ssim": float(np.nanmean(results["ssim"])),
-        "lpips": float(np.nanmean(results["lpips"])),
-        "hausdorff": float(np.nanmean([x for x in results["hausdorff"] if not np.isnan(x)])),
-    }
-
-
-def evaluate(model: UNet, ddpm: DDPM, test_loader: DataLoader, device: str, output_dir: Path, num_samples: int = 600, offset: int = 2400):
-    generated_images_dir = output_dir / "generated_images"
-    side_by_side_dir = output_dir / "side_by_side"
-
-    output_dir.mkdir(exist_ok=True, parents=True)
-    generated_images_dir.mkdir(exist_ok=True, parents=True)
-    side_by_side_dir.mkdir(exist_ok=True, parents=True)
-
-    lpips_fn = lpips.LPIPS(net='alex').to(device)
-
-    results = {"ssim": [], "lpips": [], "hausdorff": []}
-    sample_count = 0
-
-    for params, real_images in tqdm(test_loader, desc="Evaluating", leave=False, total=num_samples):
-        params = params.to(device)
-        real_images = real_images.to(device)
-
-        B = params.size(0)
-
-        generated_images = ddpm.p_sample_loop(model, params, (B, 3, 128, 128))
-
-        # LPIPS
-        lp = lpips_fn(generated_images.clamp(-1, 1), real_images.clamp(-1, 1))
-        results["lpips"].extend(lp.squeeze().cpu().tolist() if lp.numel() > 1 else [lp.item()])
-
-        for i in range(B):
-            ref_np = tensor_to_np(real_images[i])
-            gen_np = tensor_to_np(generated_images[i])
-
-            # SSIM
-            s = ssim(ref_np, gen_np, data_range=1.0, channel_axis=2)
-            results["ssim"].append(s)
-
-            # Hausdorff na krawędziach Canny
-            h = compute_hausdorff(ref_np, gen_np)
-            results["hausdorff"].append(h)
-
-            # Zapisz wygenerowane obrazy
-            save_image(generated_images[i].clamp(-1, 1), generated_images_dir / f"image_{sample_count+offset:03d}.png")
-
-            side_by_side = torch.cat([real_images[i], generated_images[i].clamp(-1, 1)], dim=2)
-            save_image((side_by_side + 1) / 2, side_by_side_dir / f"image_{sample_count+offset:03d}.png")
-
-            sample_count += 1
-
-        if sample_count >= num_samples:
-            break
-
-    metrics = {
         "SSIM": float(np.nanmean(results["ssim"])),
         "LPIPS": float(np.nanmean(results["lpips"])),
         "Hausdorff": float(np.nanmean([x for x in results["hausdorff"] if not np.isnan(x)])),
     }
-
-    return metrics
 
 
 def compute_hausdorff(img_ref: np.ndarray, img_gen: np.ndarray) -> float:
