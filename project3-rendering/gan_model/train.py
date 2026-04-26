@@ -105,7 +105,7 @@ def train(
             cond      = cond.to(device)
             B         = real_imgs.size(0)
 
-            z = torch.zeros(B, noise_dim, device=device)
+            z = torch.randn(B, noise_dim, device=device)
             with torch.no_grad():
                 fake_imgs = G(z, cond)
             loss_D = discriminator_loss(D(real_imgs, cond), D(fake_imgs, cond))
@@ -113,7 +113,7 @@ def train(
             loss_D.backward()
             opt_D.step()
 
-            z = torch.zeros(B, noise_dim, device=device)
+            z = torch.randn(B, noise_dim, device=device)
             fake_imgs    = G(z, cond)
             loss_G, loss_adv, loss_l1 = generator_loss(
                 D(fake_imgs, cond), fake_imgs, real_imgs, lambda_l1
