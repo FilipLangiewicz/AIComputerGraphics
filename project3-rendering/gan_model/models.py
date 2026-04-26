@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from torch.nn.utils import spectral_norm
 
 
 def weights_init(m):
@@ -32,22 +33,26 @@ class Generator(nn.Module):
             nn.Linear(noise_dim + cond_dim, features * 8 * 4 * 4),
             nn.ReLU(True),
         )
+        
         self.net = nn.Sequential(
-            self._up(features * 8, features * 8),
-            self._up(features * 8, features * 4),
-            self._up(features * 4, features * 2),
-            self._up(features * 2, features),
+            self._up(features * 8, features * 8, dropout=True),   
+            self._up(features * 8, features * 4, dropout=True),  
+            self._up(features * 4, features * 2, dropout=True),   
+            self._up(features * 2, features),                    
             nn.ConvTranspose2d(features, 3, 4, 2, 1),
             nn.Tanh(),
         )
 
     @staticmethod
-    def _up(ic, oc):
-        return nn.Sequential(
+    def _up(ic, oc, dropout: bool = False):
+        layers = [
             nn.ConvTranspose2d(ic, oc, 4, 2, 1, bias=False),
             nn.BatchNorm2d(oc),
             nn.ReLU(True),
-        )
+        ]
+        if dropout:
+            layers.append(nn.Dropout2d(0.3))
+        return nn.Sequential(*layers)
 
     def forward(self, z, c):
         x = torch.cat([z, c], dim=1)
@@ -70,7 +75,7 @@ class Discriminator(nn.Module):
         f = features
 
         self.img_branch = nn.Sequential(
-            nn.Conv2d(3, f, 4, 2, 1, bias=False),
+            spectral_norm(nn.Conv2d(3, f, 4, 2, 1, bias=False)),
             nn.LeakyReLU(0.2, True),
             self._down(f,     f * 2),
             self._down(f * 2, f * 4),
@@ -79,21 +84,20 @@ class Discriminator(nn.Module):
         img_flat = f * 8 * 8 * 8
 
         self.cond_proj = nn.Sequential(
-            nn.Linear(cond_dim, f * 8),
+            spectral_norm(nn.Linear(cond_dim, f * 8)),
             nn.LeakyReLU(0.2, True),
         )
         self.head = nn.Sequential(
-            nn.Linear(img_flat + f * 8, 1024),
+            spectral_norm(nn.Linear(img_flat + f * 8, 1024)),
             nn.LeakyReLU(0.2, True),
             nn.Dropout(0.3),
-            nn.Linear(1024, 1),
+            spectral_norm(nn.Linear(1024, 1)),
         )
 
     @staticmethod
     def _down(ic, oc):
         return nn.Sequential(
-            nn.Conv2d(ic, oc, 4, 2, 1, bias=False),
-            nn.BatchNorm2d(oc),
+            spectral_norm(nn.Conv2d(ic, oc, 4, 2, 1, bias=False)),
             nn.LeakyReLU(0.2, True),
         )
 

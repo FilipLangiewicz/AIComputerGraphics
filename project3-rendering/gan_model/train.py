@@ -6,7 +6,7 @@ import torch
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from torchvision.utils import save_image
-from tqdm import tqdm
+from tqdm.auto import tqdm
 import matplotlib.pyplot as plt
 
 from losses import discriminator_loss, generator_loss
@@ -46,8 +46,10 @@ def train(
     output_dir:  Path,
     ckpt_dir:    Path,
     epochs:      int   = 150,
-    lr:          float = 2e-4,
-    betas:       tuple = (0.5, 0.999),
+    lr_G:        float = 2e-4,
+    lr_D:        float = 5e-5,
+    betas_G:     tuple = (0.5, 0.999),
+    betas_D:     tuple = (0.5, 0.999),
     lambda_l1:   float = 100.0,
     batch_size:  int   = 32,
     num_workers: int   = 2,
@@ -72,8 +74,8 @@ def train(
     test_loader  = DataLoader(test_ds,  batch_size=batch_size, shuffle=False,
                               num_workers=num_workers, pin_memory=pin_memory)
 
-    opt_G   = optim.Adam(G.parameters(), lr=lr, betas=betas)
-    opt_D   = optim.Adam(D.parameters(), lr=lr, betas=betas)
+    opt_G = optim.Adam(G.parameters(), lr=lr_G, betas=betas_G)
+    opt_D = optim.Adam(D.parameters(), lr=lr_D, betas=betas_D)
     sched_G = optim.lr_scheduler.CosineAnnealingLR(opt_G, T_max=epochs, eta_min=1e-5)
     sched_D = optim.lr_scheduler.CosineAnnealingLR(opt_D, T_max=epochs, eta_min=1e-5)
 
@@ -103,7 +105,7 @@ def train(
             cond      = cond.to(device)
             B         = real_imgs.size(0)
 
-            z = torch.randn(B, noise_dim, device=device)
+            z = torch.zeros(B, noise_dim, device=device)
             with torch.no_grad():
                 fake_imgs = G(z, cond)
             loss_D = discriminator_loss(D(real_imgs, cond), D(fake_imgs, cond))
@@ -111,7 +113,7 @@ def train(
             loss_D.backward()
             opt_D.step()
 
-            z = torch.randn(B, noise_dim, device=device)
+            z = torch.zeros(B, noise_dim, device=device)
             fake_imgs    = G(z, cond)
             loss_G, loss_adv, loss_l1 = generator_loss(
                 D(fake_imgs, cond), fake_imgs, real_imgs, lambda_l1
