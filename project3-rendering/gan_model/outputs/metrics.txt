@@ -1,0 +1,4 @@
+FLIP      : 0.0125
+LPIPS     : 0.1303
+SSIM      : 0.9650
+Hausdorff : 19.63
