@@ -46,7 +46,7 @@ def compute_metrics(
 
             B = params.size(0)
 
-            generated_images = ddpm.p_sample_loop(model, params, (B, 3, 128, 128))
+            generated_images = ddpm.ddim_sample_loop(model, params, (B, 3, 128, 128), ddim_steps=50)
 
             lp = lpips_fn(generated_images.clamp(-1, 1), real_images.clamp(-1, 1))
             results["lpips"].extend(lp.squeeze().cpu().tolist() if lp.numel() > 1 else [lp.item()])
@@ -76,7 +76,7 @@ def compute_metrics(
     }
 
 
-def compute_hausdorff(img_ref: np.ndarray, img_gen: np.ndarray) -> float:
+def compute_hausdorff(img_ref, img_gen, max_points=500):
     gray_ref = cv2.cvtColor((img_ref * 255).astype(np.uint8), cv2.COLOR_RGB2GRAY)
     gray_gen = cv2.cvtColor((img_gen * 255).astype(np.uint8), cv2.COLOR_RGB2GRAY)
 
@@ -89,10 +89,13 @@ def compute_hausdorff(img_ref: np.ndarray, img_gen: np.ndarray) -> float:
     if len(pts_ref) == 0 or len(pts_gen) == 0:
         return float('nan')
 
-    d1 = directed_hausdorff(pts_ref, pts_gen)[0]
-    d2 = directed_hausdorff(pts_gen, pts_ref)[0]
+    if len(pts_ref) > max_points:
+        pts_ref = pts_ref[np.random.choice(len(pts_ref), max_points, replace=False)]
 
-    return max(d1, d2)
+    if len(pts_gen) > max_points:
+        pts_gen = pts_gen[np.random.choice(len(pts_gen), max_points, replace=False)]
+
+    return max(directed_hausdorff(pts_ref, pts_gen)[0], directed_hausdorff(pts_gen, pts_ref)[0])
 
 
 def tensor_to_np(t: torch.Tensor) -> np.ndarray:
