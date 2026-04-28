@@ -1,0 +1,72 @@
+import torch
+from unet import UNet
+
+class DDPM:
+    def __init__(self, T: int = 200, beta_start: float = 1e-4, beta_end: float = 0.02, device: str = "cuda"):
+        self.T = T
+        self.device = device
+
+        betas = torch.linspace(beta_start, beta_end, T, device=device)
+        alphas = 1.0 - betas
+        alpha_bar = torch.cumprod(alphas, dim=0)
+
+        self.betas = betas
+        self.alpha_bar = alpha_bar
+        self.sqrt_ab = alpha_bar.sqrt()
+        self.sqrt_1mab = (1 - alpha_bar).sqrt()
+
+    def q_sample(self, x0: torch.Tensor, t: torch.Tensor, noise: torch.Tensor | None = None) -> tuple[torch.Tensor, torch.Tensor]:
+        if noise is None:
+            noise = torch.randn_like(x0)
+
+        ab = self.sqrt_ab[t][:, None, None, None]
+        mab = self.sqrt_1mab[t][:, None, None, None]
+
+        return ab * x0 + mab * noise, noise
+
+    @torch.no_grad()
+    def p_sample_loop(self, model: UNet, cond: torch.Tensor, shape: tuple) -> torch.Tensor:
+        x = torch.randn(shape, device=self.device)
+
+        model.eval()
+
+        for t_val in reversed(range(self.T)):
+            t = torch.full((shape[0],), t_val, device=self.device, dtype=torch.long)
+            pred_noise = model(x, t, cond)
+
+            beta = self.betas[t_val]
+            alpha = 1.0 - beta
+            alpha_bar = self.alpha_bar[t_val]
+
+            coef = beta / (1 - alpha_bar).sqrt()
+            mean = (x - coef * pred_noise) / alpha.sqrt()
+
+            if t_val > 0:
+                noise = torch.randn_like(x)
+                x = mean + beta.sqrt() * noise
+            else:
+                x = mean
+
+        return x
+
+    @torch.no_grad()
+    def ddim_sample_loop(self, model, cond, shape, ddim_steps=20):
+        x = torch.randn(shape, device=self.device)
+
+        model.eval()
+
+        step_indices = torch.linspace(0, self.T - 1, ddim_steps, dtype=torch.long)
+        steps = list(reversed(step_indices.tolist()))
+
+        for i, t_val in enumerate(steps):
+            t = torch.full((shape[0],), int(t_val), device=self.device, dtype=torch.long)
+            pred_noise = model(x, t, cond)
+
+            ab = self.alpha_bar[int(t_val)]
+            ab_prev = self.alpha_bar[int(steps[i + 1])] if i + 1 < len(steps) else torch.tensor(1.0)
+
+            x0_pred = (x - (1 - ab).sqrt() * pred_noise) / ab.sqrt()
+            x0_pred = x0_pred.clamp(-1, 1)
+            x = ab_prev.sqrt() * x0_pred + (1 - ab_prev).sqrt() * pred_noise
+
+        return x
