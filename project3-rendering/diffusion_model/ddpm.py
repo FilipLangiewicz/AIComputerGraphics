@@ -48,3 +48,25 @@ class DDPM:
                 x = mean
 
         return x
+
+    @torch.no_grad()
+    def ddim_sample_loop(self, model, cond, shape, ddim_steps=20):
+        x = torch.randn(shape, device=self.device)
+
+        model.eval()
+
+        step_indices = torch.linspace(0, self.T - 1, ddim_steps, dtype=torch.long)
+        steps = list(reversed(step_indices.tolist()))
+
+        for i, t_val in enumerate(steps):
+            t = torch.full((shape[0],), int(t_val), device=self.device, dtype=torch.long)
+            pred_noise = model(x, t, cond)
+
+            ab = self.alpha_bar[int(t_val)]
+            ab_prev = self.alpha_bar[int(steps[i + 1])] if i + 1 < len(steps) else torch.tensor(1.0)
+
+            x0_pred = (x - (1 - ab).sqrt() * pred_noise) / ab.sqrt()
+            x0_pred = x0_pred.clamp(-1, 1)
+            x = ab_prev.sqrt() * x0_pred + (1 - ab_prev).sqrt() * pred_noise
+
+        return x
