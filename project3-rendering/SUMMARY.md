@@ -10,15 +10,130 @@ Celem projektu było stworzenie modelu sztucznej inteligencji, który realizuje 
 ## Przygotowanie zbioru danych
 Autor: Dominika Boguszewska
 
+W ramach przygotowania zbioru danych zmodyfikowałam funkcję `on_render` w klasie `PhongWindow`, dodając losowanie parametrów sceny przy każdym renderze. Dla każdego z 3000 obrazów losowane były: pozycja kuli i źródła światła (każda składowa z zakresu (-20, 20)), kolor rozproszenia materiału (każda składowa z (0, 255), normalizowana do (0, 1) dla shadera) oraz współczynnik połyskliwości z zakresu (3, 20). Pozostałe parametry, czyli kolor otoczenia, odbicia oraz kolory światła były stałe.
 
-## Sieć dyfuzyjna
+Każdy wygenerowany obraz (128×128 px) był zapisywany do katalogu `images/` jako `image_XXXX.png`, a towarzyszący mu plik JSON z użytymi parametrami do katalogu `params/` jako `XXXX.json`. 
+
+Dodatkowo dodałam zabezpieczenie odrzucające prawie czarne obrazy, czyli przypadki gdy kula wylądowała poza kadrem kamery.
+
+## Model dyfuzyjny
 Autor: Dominika Boguszewska
 
+### Podział danych
 
+| Zbiór       | Indeksy       | Liczba próbek |
+|-------------|---------------|---------------|
+| Treningowy  | 0 – 2039      | 2040          |
+| Walidacyjny | 2040 – 2399   | 360           |
+| Testowy     | 2400 – 2999   | 600           |
+
+---
+
+### Architektura modelu
+
+Model stanowi wariant architektury U-Net, rozszerzony o mechanizmy warunkowania oraz embedding czasu, charakterystyczne dla modeli dyfuzyjnych, takich jak DDPM. Jego celem jest przetwarzanie obrazu wejściowego z uwzględnieniem kroku czasowego procesu oraz dodatkowych parametrów warunkujących.
+
+Model składa się z elementów takich jak:
+- **Sinusoidalny embedding czasu** - przekształca skalar reprezentujący krok czasowy t do wektora o ustalonym wymiarze, który koduje informację o pozycji w procesie dyfuzyjnym przy użyciu funkcji sinus i cosinus o różnych częstotliwościach,
+- **Embedding warunku** - przyjmuje dodatkowe dane wejściowe w postaci wektora parametrów, które są mapowane do przestrzeni o tym samym wymiarze co embedding czasu,
+- **Blok resztkowy (Residual Block)** - podstawowy element architektury składający się z warstw kowolucyjnych, GroupNorm oraz funkcji aktywacji SiLU,
+- **Mechanizm Self-Attention** - umożliwiający modelowanie zależności globalnych pomiędzy wszystkimi pikselami obrazu.
+
+---
+
+### Model dyfuzyjny (DDPM)
+
+Zastosowano model dyfuzyjny typu DDPM, którego celem jest stopniowe generowanie danych poprzez odwracanie procesu dodawania szumu.
+
+Model składa się z dwóch głównych procesów:
+- procesu forward (dyfuzji) – stopniowego dodawania szumu do danych,
+- procesu reverse (denoisingu) – iteracyjnego usuwania szumu przy użyciu sieci neuronowej (U-Net).
+
+W celu ewaluacji zaimplementowano również wariant deterministyczny, inspirowany metodą DDIM (Denoising Diffusion Implicit Models), który umożliwia znaczące przyspieszenie generacji. Zamiast pełnej liczby kroków T, używana jest mniejsza liczba kroków K≪T.
+
+Zarówno w procesie DDPM, jak i DDIM, model przyjmuje dodatkowy wektor warunkujący cond, który wpływa na generowane próbki. Dzięki temu możliwe jest sterowanie wynikami generacji, np. poprzez parametry wejściowe.
+
+---
+
+### Trening
+
+#### Środowisko
+
+| Parametr       | Wartość         |
+|----------------|-----------------|
+| Platforma      | Kaggle Notebook |
+| GPU            | NVIDIA Tesla T4 |
+| Framework      | PyTorch (CUDA)  |
+| Seed           | 42              |
+
+#### Hiperparametry treningu
+
+| Hiperparametr           | Wartość       |
+|-------------------------|---------------|
+| Liczba epok             | 200           |
+| Batch size              | 32            |
+| Learning Rate           | 1e-4          |
+| Funkcja straty          | MSE Loss      |
+| Optimizer               | Adam          |
+| EMA Model               | AveragedModel |
+| Scheduler               | OneCycleLR    |
+| Early stopping patience | 10            |
+
+#### Przebieg treningu
+
+Proces treningu realizowany jest w pętli epok, z wykorzystaniem optymalizatora Adam oraz harmonogramu zmiany współczynnika uczenia OneCycleLR. Dodatkowo zastosowano mechanizm uśredniania wag modelu (EMA – Exponential Moving Average), który poprawia stabilność i jakość generowanych próbek.
+
+Na końcu każdej epoki aktualna wartości funckji straty na zbiorze walidacyjnym była porównywana z najlepszą uzyskaną stratą walidacyjną. Jeśli uległa ona poprawie, model EMA był zapisywany jako najlepszy (`best_model.pth`). W przeciwnym przypadku zwiększany był licznik braku poprawy. Po przekroczeniu ustalonego progu (`EARLY_STOPPING_PATIENCE`) trening był przerywany (early stopping).
+
+Trening zakończył się po 67 epokach ze stratą treningową 0.0018 oraz walidacyjną 0.00088. Natomiast w pliku `best_model.pth` był zapisany model z 57 epoki ze stratą treningową 0.0012 oraz walidacyjną 0.00077.
+
+---
+
+### Ewaluacja
+
+#### Metryki jakości
+
+| Metoda          | FLIP   | LPIPS  | SSIM   | Hausdorff |
+|-----------------|--------|--------|--------|-----------|
+| Model dyfuzyjny | 0.0211 | 0.7940 | 0.0020 | 74.9360   |
+
+#### Interpretacja metryk
+
+- **FLIP (0.0211):** Niska wartość metryki FLIP wskazuje na niewielkie różnice percepcyjne między obrazami generowanymi a referencyjnymi. Oznacza to, że z punktu widzenia ludzkiego wzroku lokalne błędy są stosunkowo małe. Model dobrze odwzorowuje ogólną percepcję obrazu, mimo możliwych różnic strukturalnych.
+- **LPIPS (0.7940):** Wysoka wartość LPIPS sugeruje dużą różnicę percepcyjną na poziomie cech wysokiego poziomu (deep features). Oznacza to, że choć obrazy mogą wyglądać podobnie globalnie, model nie odwzorowuje dobrze bardziej złożonych struktur i semantyki obrazu. Wskazuje to na ograniczoną zdolność modelu do uchwycenia szczegółowych cech wizualnych.
+- **SSIM (0.0020):** Bardzo niska wartość SSIM oznacza niemal całkowity brak zgodności strukturalnej między obrazami. Model nie zachowuje lokalnych zależności przestrzennych, takich jak krawędzie czy tekstury. Może to sugerować, że generowane obrazy są znacznie zdeformowane względem oryginałów lub różnią się w układzie przestrzennym.
+- **Hausdorff (74.9360 px):** Wysoka wartość odległości Hausdorffa wskazuje na duże maksymalne odchylenia między odpowiadającymi sobie strukturami w obrazach. Oznacza to, że w najgorszych przypadkach elementy obrazu są znacząco przesunięte lub niepokrywające się, co potwierdza problemy z dokładnym odwzorowaniem geometrii.
+
+#### Porównanie wygenerowanych obrazów z oryginalnymi
+
+Modelem `diffusion_model_results/2026-04-27_18-16-28/best_model.pth` wygenerowano 600 obrazów dla wszystkich próbek zbioru testowego.
+
+![DiffusionModelTest](diffusion_model_results/2026-04-27_18-16-28/image_comparison.png)
+
+---
+
+### Podsumowanie
+
+Uzyskane rezultaty wskazują, że model generuje obrazy o niskiej jakości i ograniczonej zgodności z danymi referencyjnymi. Pomimo zastosowania architektury dyfuzyjnej, model nie nauczył się poprawnie odwzorowywać struktury generowanych obiektów.
+
+W praktyce wygenerowane obrazy często przyjmują formę nieregularnych skupisk kolorowych pikseli na czarnym tle, zamiast oczekiwanych, spójnych wizualnie obiektów. W szczególności model nie odtwarza poprawnie:
+- kształtu obiektu (np. kuli),
+- ciągłości powierzchni,
+- efektów oświetlenia, takich jak model odbicia Phonga.
+
+Wyniki te są spójne z uzyskanymi metrykami jakości:
+- bardzo niska wartość SSIM wskazuje na brak zgodności strukturalnej,
+- wysoka odległość Hausdorffa potwierdza duże błędy geometryczne,
+- wysoki LPIPS sugeruje brak zgodności na poziomie cech percepcyjnych.
+
+Można zatem wnioskować, że model nie nauczył się reprezentacji przestrzennej ani fizycznych właściwości sceny, a jego predykcje mają w dużej mierze charakter losowy lub silnie zaszumiony.
+
+Podsumowując, obecna konfiguracja modelu oraz proces treningowy nie pozwalają na generowanie realistycznych obrazów zgodnych z założeniami zadania.
+
+---
 
 ## Sieć GAN
 Autor: Filip Langiewicz
-
 
 ### Podział danych
 
