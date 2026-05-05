@@ -233,3 +233,5 @@ project2-ldr-to-hdr/neural_network/models/
 
 .pro3-sigk/
 project3-rendering/gan_model/checkpoints/*.pth
+
+.pro4-sigk/
