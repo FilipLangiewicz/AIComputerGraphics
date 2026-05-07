@@ -54,3 +54,33 @@ def interpolate_pointclouds(src: np.ndarray, tgt: np.ndarray, steps: int = 3) ->
         src + (tgt - src) * t
         for t in np.linspace(0, 1, steps)
     ]
+    
+def visualize_transition_3d(
+    step_clouds: list[np.ndarray],
+    titles: list[str] = None,
+    point_size: int = 2,
+):
+    """Interactive 3D visualization of transition steps using plotly."""
+    import plotly.graph_objects as go
+    from plotly.subplots import make_subplots
+
+    n = len(step_clouds)
+    fig = make_subplots(
+        rows=1, cols=n,
+        specs=[[{"type": "scatter3d"}] * n],
+        subplot_titles=titles or [f"Step {i}" for i in range(n)],
+    )
+
+    for i, cloud in enumerate(step_clouds):
+        fig.add_trace(
+            go.Scatter3d(
+                x=cloud[:, 0], y=cloud[:, 1], z=cloud[:, 2],
+                mode="markers",
+                marker=dict(size=point_size, color=cloud[:, 2], colorscale="Viridis"),
+                showlegend=False,
+            ),
+            row=1, col=i + 1,
+        )
+
+    fig.update_layout(height=500, margin=dict(l=0, r=0, t=40, b=0))
+    fig.show()
