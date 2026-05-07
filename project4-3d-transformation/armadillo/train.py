@@ -164,7 +164,7 @@ def train(
 
     # loss curves
     fig, ax = plt.subplots(figsize=(10, 4))
-    ax.plot(history["train"], label="Train loss")
+    ax.plot(range(1, len(history["train"]) + 1), history["train"], label="Train loss")
     ax.plot(history["val_epochs"], history["val"], "o--", label="Val loss")
     ax.set_title("Chamfer loss — Armadillo → Teapot")
     ax.set_xlabel("Epoch")
