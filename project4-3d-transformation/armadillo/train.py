@@ -8,8 +8,8 @@ from torch.utils.data import DataLoader, random_split
 from tqdm.auto import tqdm
 import matplotlib.pyplot as plt
 
-from model import VectorFieldNet
-from dataset import ArmadilloTeapotDataset
+from .model import VectorFieldNet
+from .dataset import ArmadilloTeapotDataset
 
 
 def chamfer_loss(pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
