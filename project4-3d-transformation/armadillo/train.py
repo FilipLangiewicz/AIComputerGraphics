@@ -76,6 +76,7 @@ def train(
     # misc
     device: str = "cuda",
     ckpt_dir: str = "armadillo/checkpoints",
+    resume_from: str = None,   # path to checkpoint to resume from
     seed: int = 42,
     num_workers: int = 2,
 ) -> VectorFieldNet:
@@ -107,6 +108,11 @@ def train(
         output_hidden_dims=output_hidden_dims,
         dropout=dropout,
     ).to(device)
+    
+    # resume from checkpoint if provided
+    if resume_from is not None:
+        model.load_state_dict(torch.load(resume_from, map_location=device))
+        print(f"Resumed from: {resume_from}")
 
     n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print(f"VectorFieldNet  params: {n_params:,}")
