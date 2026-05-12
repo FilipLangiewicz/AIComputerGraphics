@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 
 
-class BunnyToTeapotVectorField(nn.Module):
+class DragonToTeapotVectorField(nn.Module):
     def __init__(
         self,
         local_feat_dims: list[int] | None = None,
@@ -76,12 +76,12 @@ def load_model(
     head_dims: list[int] | None = None,
     dropout: float = 0.0,
     device: str = "cpu",
-) -> BunnyToTeapotVectorField:
+) -> DragonToTeapotVectorField:
 
     local_feat_dims, context_feat_dims, head_dims = validate_dims(local_feat_dims, context_feat_dims, head_dims)
     device_t = torch.device(device)
 
-    model = BunnyToTeapotVectorField(
+    model = DragonToTeapotVectorField(
         local_feat_dims=local_feat_dims,
         context_feat_dims=context_feat_dims,
         head_dims=head_dims,
