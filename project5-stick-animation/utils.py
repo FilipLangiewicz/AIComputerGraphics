@@ -42,29 +42,25 @@ JOINT_CONNECTIONS = [
 ]
 
 
-OUTPUT_PATH = os.path.dirname(__file__)
+OUTPUT_PATH = os.getcwd()
 
 
-def animate_skeleton_3d(tensor_data, output_filename=None, fps=24):
-    """
-    Creates a 3D stickman animation from a coordinate tensor.
-    tensor_data: numpy array of shape [T, 15, 3] (T - number of frames)
-    Currently supported output type: .gif
-    """
-
+def animate_skeleton_3d(tensor_data, output_filename=None, fps=24, margin=5):
     fig = plt.figure(figsize=(8, 8))
     ax = fig.add_subplot(111, projection='3d')
-    
-    ax.set_xlim(-1.5, 1.5)
-    ax.set_ylim(-1.5, 1.5)
-    ax.set_zlim(-1.5, 1.5)
-    
+
+    mins = tensor_data.min(axis=(0, 1))
+    maxs = tensor_data.max(axis=(0, 1))
+    ax.set_xlim(mins[0] - margin, maxs[0] + margin)
+    ax.set_ylim(mins[1] - margin, maxs[1] + margin)
+    ax.set_zlim(mins[2] - margin, maxs[2] + margin)
+
     ax.set_box_aspect([1, 1, 1])
     ax.set_title("3D Stickman Motion Visualization")
     ax.set_xlabel('X Axis')
     ax.set_ylabel('Y Axis')
     ax.set_zlabel('Z Axis')
-    
+      
     points_scatter = ax.scatter([], [], [], c='red', s=40, zorder=3)
     lines = [
         ax.plot([], [], [], c='blue', lw=2, zorder=2)[0]
@@ -113,3 +109,4 @@ def animate_skeleton_3d(tensor_data, output_filename=None, fps=24):
             fps=fps
         )
     plt.show()
+    return anim
