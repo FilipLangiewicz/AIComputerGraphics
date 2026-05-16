@@ -235,3 +235,6 @@ project2-ldr-to-hdr/neural_network/models/
 project3-rendering/gan_model/checkpoints/*.pth
 
 .pro4-sigk/
+
+project5-stick-animation/data/
+.pro5-sigk/
