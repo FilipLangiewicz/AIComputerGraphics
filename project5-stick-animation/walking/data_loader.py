@@ -27,12 +27,6 @@ JOINT_ORDER = [
     "LEFT_HIP", "LEFT_KNEE", "LEFT_ANKLE",
 ]
 
-def _collect_all_joints(root):
-    joints = [root]
-    for child in root.Children:
-        joints.extend(_collect_all_joints(child))
-    return joints
-
 def load_bvh_as_tensor(bvh_path: str) -> np.ndarray:
     """Returns [T, 15, 3] world-space positions."""
     root = bvhio.readAsHierarchy(bvh_path)
