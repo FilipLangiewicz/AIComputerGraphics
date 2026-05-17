@@ -49,6 +49,7 @@ def _sample_qualitative(model: MotionDenoiser, diffusion: GaussianDiffusion,
 
 def train(
     dataset: MotionDataset,
+    norm_stats_path: str = None,
     # model
     d_model: int = 256,
     nhead: int = 4,
@@ -85,8 +86,7 @@ def train(
     random.seed(seed)
 
     device = torch.device(device if torch.cuda.is_available() else "cpu")
-    norm_stats_path = Path(ckpt_dir).parent / "data" / "norm_stats.npy"
-    norm_stats = np.load(norm_stats_path) if norm_stats_path.exists() else None
+    norm_stats = np.load(norm_stats_path) if norm_stats_path and Path(norm_stats_path).exists() else None
     ckpt_dir = Path(ckpt_dir)
     (ckpt_dir / "samples").mkdir(parents=True, exist_ok=True)
 
