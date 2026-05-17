@@ -33,12 +33,16 @@ def _build_scheduler(optimizer, name: str, epochs: int):
 def _sample_qualitative(model: MotionDenoiser, diffusion: GaussianDiffusion,
                          device: torch.device, n_samples: int,
                          num_classes: int, guidance_scale: float,
-                         out_path: Path) -> None:
+                         out_path: Path, norm_stats: np.ndarray = None) -> None:
     model.eval()
     samples = {}
     for cls_id in range(num_classes):
         labels = torch.full((n_samples,), cls_id, dtype=torch.long, device=device)
-        samples[cls_id] = diffusion.sample(model, labels, guidance_scale=guidance_scale).cpu()
+        motion = diffusion.sample(model, labels, guidance_scale=guidance_scale).cpu()
+        if norm_stats is not None:                       
+            mean, std = norm_stats[0], norm_stats[1]
+            motion = motion * std + mean
+        samples[cls_id] = motion
     torch.save(samples, out_path)
     model.train()
 
@@ -81,6 +85,8 @@ def train(
     random.seed(seed)
 
     device = torch.device(device if torch.cuda.is_available() else "cpu")
+    norm_stats_path = Path(ckpt_dir).parent / "data" / "norm_stats.npy"
+    norm_stats = np.load(norm_stats_path) if norm_stats_path.exists() else None
     ckpt_dir = Path(ckpt_dir)
     (ckpt_dir / "samples").mkdir(parents=True, exist_ok=True)
 
@@ -152,7 +158,7 @@ def train(
         if epoch % eval_every == 0 or epoch == epochs:
             out_path = ckpt_dir / "samples" / f"samples_e{epoch:03d}.pt"
             _sample_qualitative(model, diffusion, device, eval_samples,
-                                 num_classes, guidance_scale, out_path)
+                                 num_classes, guidance_scale, out_path, norm_stats)
             print(f"  |  samples → {out_path.name}", end="")
 
         print()

@@ -97,6 +97,16 @@ def prepare_data():
 
         sequences = np.stack(sequences).astype(np.float32)
         labels = np.array(labels, dtype=np.int64)
+
+        if split_name == "train":
+            mean = sequences.mean()
+            std = sequences.std()
+            np.save(os.path.join(OUT_DIR, "norm_stats.npy"), np.array([mean, std]))
+        else:
+            stats = np.load(os.path.join(OUT_DIR, "norm_stats.npy"))
+            mean, std = stats[0], stats[1]
+
+        sequences = (sequences - mean) / (std + 1e-8)
         np.savez(os.path.join(OUT_DIR, f"{split_name}.npz"), sequences=sequences, labels=labels)
         print(f"{split_name}: {sequences.shape}, labels: {np.bincount(labels)}")
 
