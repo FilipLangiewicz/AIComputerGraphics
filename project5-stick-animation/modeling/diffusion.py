@@ -45,7 +45,14 @@ class GaussianDiffusion:
         label_input[mask] = model.null_class_idx
 
         noise_pred = model(x_noisy, t, label_input)
-        return nn.functional.mse_loss(noise_pred, noise)
+
+        loss_noise = nn.functional.mse_loss(noise_pred, noise)
+
+        pred_vel = noise_pred[:, 1:] - noise_pred[:, :-1]
+        true_vel = noise[:, 1:]      - noise[:, :-1]
+        loss_vel = nn.functional.mse_loss(pred_vel, true_vel)
+
+        return loss_noise + 0.1 * loss_vel
 
     @torch.no_grad()
     def p_sample(self, model: nn.Module, x: torch.Tensor, t: int,
