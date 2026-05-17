@@ -240,3 +240,4 @@ project5-stick-animation/data/
 .pro5-sigk/
 project5-stick-animation/modeling/selected_data/
 project5-stick-animation/modeling/trimmed_data/
+project5-stick-animation/modeling/checkpoints/*.pt
