@@ -108,13 +108,6 @@ def train(
     diffusion = GaussianDiffusion(timesteps=timesteps, beta_start=beta_start,
                                   beta_end=beta_end).to(device)
 
-    start_epoch = 1
-    if resume_from is not None:
-        ckpt = torch.load(resume_from, map_location=device)
-        model.load_state_dict(ckpt["model"])
-        start_epoch = ckpt.get("epoch", 0) + 1
-        print(f"resumed from: {resume_from}  (epoch {start_epoch})")
-
     n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print(f"MotionDenoiser  params: {n_params:,}  |  device: {device}")
     print(f"dataset: {len(dataset)}  classes: {num_classes}")
@@ -122,6 +115,7 @@ def train(
     opt   = _build_optimizer(model, optimizer, lr, weight_decay)
     sched = _build_scheduler(opt, scheduler, epochs)
 
+    start_epoch = 1
     if resume_from is not None:
         ckpt = torch.load(resume_from, map_location=device)
         model.load_state_dict(ckpt["model"])
