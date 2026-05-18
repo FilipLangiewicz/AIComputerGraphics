@@ -78,6 +78,8 @@ def train(
     device: str = "cuda",
     ckpt_dir: str = "checkpoints",
     resume_from: str = None,
+    resume_optimizer: bool = True,
+    resume_scheduler: bool = True,
     seed: int = 42,
     num_workers: int = 4,
 ) -> MotionDenoiser:
@@ -121,10 +123,14 @@ def train(
     sched = _build_scheduler(opt, scheduler, epochs)
 
     if resume_from is not None:
-        if "optimizer" in ckpt:
+        ckpt = torch.load(resume_from, map_location=device)
+        model.load_state_dict(ckpt["model"])
+        if resume_optimizer and "optimizer" in ckpt:
             opt.load_state_dict(ckpt["optimizer"])
-        if "scheduler" in ckpt and sched is not None and ckpt["scheduler"] is not None:
+        if resume_scheduler and sched is not None and ckpt.get("scheduler") is not None:
             sched.load_state_dict(ckpt["scheduler"])
+        start_epoch = ckpt.get("epoch", 0) + 1
+        print(f"resumed from: {resume_from}  (epoch {start_epoch})")
 
     history = []
 
