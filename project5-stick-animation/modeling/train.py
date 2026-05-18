@@ -69,6 +69,7 @@ def train(
     weight_decay: float = 1e-4,
     scheduler: str = "cosine",
     grad_clip: float = 1.0,
+    vel_loss_weight: float = 0.1,
     save_every: int = 50,
     # qualitative eval
     eval_every: int = 25,
@@ -137,7 +138,8 @@ def train(
             labels_b    = labels_b.to(device)
             t = torch.randint(0, diffusion.T, (sequences_b.shape[0],), device=device)
 
-            loss = diffusion.p_losses(model, sequences_b, t, labels_b, cfg_drop_prob)
+            loss = diffusion.p_losses(model, sequences_b, t, labels_b,
+                          cfg_drop_prob, vel_loss_weight)
             opt.zero_grad(set_to_none=True)
             loss.backward()
             if grad_clip > 0:

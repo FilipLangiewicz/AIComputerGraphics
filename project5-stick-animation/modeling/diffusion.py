@@ -34,7 +34,8 @@ class GaussianDiffusion:
         return sqrt_a * x0 + sqrt_1a * noise, noise
 
     def p_losses(self, model: nn.Module, x0: torch.Tensor, t: torch.Tensor,
-                 class_label: torch.Tensor, cfg_drop_prob: float = 0.1) -> torch.Tensor:
+             class_label: torch.Tensor, cfg_drop_prob: float = 0.1,
+             vel_loss_weight: float = 0.1) -> torch.Tensor:
         """Training loss: predict noise added at timestep t."""
         noise = torch.randn_like(x0)
         x_noisy, _ = self.q_sample(x0, t, noise)
@@ -52,7 +53,7 @@ class GaussianDiffusion:
         true_vel = noise[:, 1:]      - noise[:, :-1]
         loss_vel = nn.functional.mse_loss(pred_vel, true_vel)
 
-        return loss_noise + 0.1 * loss_vel
+        return loss_noise + vel_loss_weight * loss_vel
 
     @torch.no_grad()
     def p_sample(self, model: nn.Module, x: torch.Tensor, t: int,
