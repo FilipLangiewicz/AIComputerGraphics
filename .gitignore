@@ -241,3 +241,4 @@ project5-stick-animation/data/
 project5-stick-animation/modeling/selected_data/
 project5-stick-animation/modeling/trimmed_data/
 project5-stick-animation/modeling/checkpoints/*.pt
+project5-stick-animation/modeling/best_model/*.pt
