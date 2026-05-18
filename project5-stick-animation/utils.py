@@ -45,7 +45,13 @@ JOINT_CONNECTIONS = [
 OUTPUT_PATH = os.getcwd()
 
 
-def animate_skeleton_3d(tensor_data, output_filename=None, fps=24, margin=5):
+def animate_skeleton_3d(
+    tensor_data,
+    output_filename=None,
+    fps=24,
+    margin=5,
+    show=False,
+):
     fig = plt.figure(figsize=(8, 8))
     ax = fig.add_subplot(111, projection='3d')
 
@@ -108,5 +114,10 @@ def animate_skeleton_3d(tensor_data, output_filename=None, fps=24, margin=5):
             writer='pillow',
             fps=fps
         )
-    plt.show()
+        
+    if show:
+        plt.show()
+    else:
+        plt.close(fig)
+
     return anim
