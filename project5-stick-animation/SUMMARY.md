@@ -146,7 +146,26 @@ Poniżej znajduje się przykładowa siatka wygenerowanych animacji dla klasy `wa
 
 Autor: Dominika Boguszewska
 
+### Uzyskane wartości metryk
+
+W celu oceny jakości generowanych animacji wykorzystano trzy metryki: Frechet Motion Distance (FMD), Mean Per Joint Position Error (MPJPE) oraz wariancję między wygenerowanymi próbkami (Var). Metryki te pozwalają ocenić zarówno zgodność wygenerowanego ruchu z danymi rzeczywistymi, jak i różnorodność generowanych animacji.
+
+| **Ruch** |  **FMD** | **MPJPE** | **Var** |
+|:--------:|---------:|----------:|--------:|
+|  *walk*  |  35.0393 |    2.7084 |  9.5103 |
+|  *jump*  | 149.2054 |    2.1211 |  3.3395 |
+
+### Analiza wyników
+
+Dla animacji typu walk uzyskano znacznie niższą wartość metryki FMD niż dla ruchu jump. Oznacza to, że generowane sekwencje chodu są bardziej zbliżone do rzeczywistych danych treningowych pod względem ogólnej dynamiki i rozkładu ruchu. Ruch chodzenia jest bardziej regularny i powtarzalny, dzięki czemu model łatwiej uczy się jego charakterystyki. W przypadku animacji jump wartość FMD jest wyraźnie wyższa, co wskazuje, że model miał większe trudności z poprawnym odwzorowaniem tego typu ruchu. Skok jest ruchem bardziej dynamicznym i mniej przewidywalnym niż chód, dlatego generowanie realistycznych trajektorii pozycji stawów jest trudniejsze.
+
+Metryka MPJPE osiągnęła podobne wartości dla obu ruchów. Dla ruchu jump uzyskano nawet nieco niższy błąd niż dla walk, co sugeruje, że średnie położenie stawów było odwzorowane poprawnie. Jednocześnie wysoki FMD dla skoku pokazuje, że mimo poprawnych pozycji pojedynczych stawów, cała dynamika ruchu mogła odbiegać od rzeczywistych sekwencji.
+
+Analizując wariancję (Var), można zauważyć, że dla ruchu walk jest ona większa niż dla jump. Oznacza to, że model generował bardziej zróżnicowane animacje chodu, co można uznać za pozytywny rezultat świadczący o kreatywności modelu i unikaniu generowania identycznych próbek. Niższa wariancja dla skoku może wskazywać, że model częściej generował podobne sekwencje ruchu, prawdopodobnie ze względu na trudność tego zadania.
+
 ---
 
 ## Podsumowanie
+
+Przeprowadzona ewaluacja pokazuje, że model lepiej radzi sobie z generowaniem ruchu typu walk niż jump. Animacje chodu są bardziej realistyczne i bardziej zróżnicowane, co potwierdzają niższe wartości FMD oraz wyższa wariancja. Generowanie ruchu skoku okazało się bardziej wymagające, szczególnie pod względem zachowania realistycznej dynamiki ruchu. Mimo to uzyskane wartości MPJPE wskazują, że model poprawnie odwzorowuje pozycje stawów i potrafi generować spójne animacje szkieletowe.
 
