@@ -146,26 +146,156 @@ Poniżej znajduje się przykładowa siatka wygenerowanych animacji dla klasy `wa
 
 Autor: Dominika Boguszewska
 
+### Generowanie próbek ruchu
+
+W celu ewaluacji modelu, dla każdej klasy ruchu (walk, jump) generowana jest liczba próbek równa liczbie rzeczywistych sekwencji treningowych oraz testowych danej klasy. Generowanie odbywa się za pomocą wytrenowanego modelu dyfuzyjnego, a następnie wygenerowane próbki są denormalizowane przy użyciu obliczonych statystyk, aby przywrócić je do oryginalnej przestrzeni współrzędnych.
+
 ### Uzyskane wartości metryk
 
 W celu oceny jakości generowanych animacji wykorzystano trzy metryki: Frechet Motion Distance (FMD), Mean Per Joint Position Error (MPJPE) oraz wariancję między wygenerowanymi próbkami (Var). Metryki te pozwalają ocenić zarówno zgodność wygenerowanego ruchu z danymi rzeczywistymi, jak i różnorodność generowanych animacji.
 
-| **Ruch** |  **FMD** | **MPJPE** | **Var** |
-|:--------:|---------:|----------:|--------:|
-|  *walk*  |  35.0393 |    2.7084 |  9.5103 |
-|  *jump*  | 149.2054 |    2.1211 |  3.3395 |
+#### Zbiór treningowy
 
-### Analiza wyników
+| **Ruch** |  **FMD** | **MPJPE** | **Var** | **L. Próbek** |
+|:--------:|---------:|----------:|--------:|--------------:|
+|  *walk*  |  31.0329 |    2.7094 |  9.5011 |           623 |
+|  *jump*  | 139.7607 |    2.0850 |  3.4029 |           637 |
 
-Dla animacji typu walk uzyskano znacznie niższą wartość metryki FMD niż dla ruchu jump. Oznacza to, że generowane sekwencje chodu są bardziej zbliżone do rzeczywistych danych treningowych pod względem ogólnej dynamiki i rozkładu ruchu. Ruch chodzenia jest bardziej regularny i powtarzalny, dzięki czemu model łatwiej uczy się jego charakterystyki. W przypadku animacji jump wartość FMD jest wyraźnie wyższa, co wskazuje, że model miał większe trudności z poprawnym odwzorowaniem tego typu ruchu. Skok jest ruchem bardziej dynamicznym i mniej przewidywalnym niż chód, dlatego generowanie realistycznych trajektorii pozycji stawów jest trudniejsze.
+Wyniki uzyskane na zbiorze treningowym wskazują, że model dobrze nauczył się charakterystyki ruchu walk. Niska wartość FMD oznacza, że rozkład wygenerowanych animacji jest stosunkowo bliski rzeczywistym danym treningowym. Dodatkowo wysoka wariancja dla ruchu walk świadczy o tym, że model generował różnorodne sekwencje ruchu, unikając nadmiernego powielania tych samych animacji.
 
-Metryka MPJPE osiągnęła podobne wartości dla obu ruchów. Dla ruchu jump uzyskano nawet nieco niższy błąd niż dla walk, co sugeruje, że średnie położenie stawów było odwzorowane poprawnie. Jednocześnie wysoki FMD dla skoku pokazuje, że mimo poprawnych pozycji pojedynczych stawów, cała dynamika ruchu mogła odbiegać od rzeczywistych sekwencji.
+Dla ruchu jump uzyskano wyraźnie wyższy wynik FMD, co sugeruje, że model miał większe trudności z odwzorowaniem dynamiki skoku. Ruch skoku jest bardziej gwałtowny i mniej regularny niż chód, dlatego poprawne modelowanie trajektorii ruchu stanowi większe wyzwanie. Jednocześnie wartość MPJPE dla skoku była niższa niż dla chodu, co oznacza, że średnie położenia stawów zostały odwzorowane poprawnie, mimo że ogólna dynamika ruchu odbiegała bardziej od danych rzeczywistych.
 
-Analizując wariancję (Var), można zauważyć, że dla ruchu walk jest ona większa niż dla jump. Oznacza to, że model generował bardziej zróżnicowane animacje chodu, co można uznać za pozytywny rezultat świadczący o kreatywności modelu i unikaniu generowania identycznych próbek. Niższa wariancja dla skoku może wskazywać, że model częściej generował podobne sekwencje ruchu, prawdopodobnie ze względu na trudność tego zadania.
+#### Zbiór testowy
+
+| **Ruch** |   **FMD** | **MPJPE** | **Var** | **L. Próbek** |
+|:--------:|----------:|----------:|--------:|--------------:|
+|  *walk*  | 2596.0407 |   10.5151 |  8.6794 |            23 |
+|  *jump*  |  882.1705 |    7.1853 |  3.5913 |            12 |
+
+Na zbiorze testowym wartości metryk uległy znacznemu pogorszeniu. Szczególnie widoczny jest bardzo wysoki wzrost FMD dla obu typów ruchu, zwłaszcza dla walk. Oznacza to, że animacje generowane dla danych niewidzianych podczas treningu znacznie odbiegają od rzeczywistych sekwencji ruchu. Wskazuje to na ograniczoną zdolność modelu do generalizacji.
+
+Również wartości MPJPE wzrosły kilkukrotnie względem zbioru treningowego, co oznacza większe błędy w pozycjach stawów dla danych testowych. Mimo tego ruch jump nadal osiągał niższy MPJPE niż walk, co sugeruje, że model względnie dobrze zachowywał lokalne pozycje stawów nawet przy trudniejszym ruchu.
+
+Wartości wariancji na zbiorze testowym pozostały zbliżone do wyników treningowych. Oznacza to, że model nadal generował zróżnicowane animacje i nie doszło do całkowitego zaniku różnorodności generowanych próbek. Szczególnie dla ruchu walk utrzymana została stosunkowo wysoka wartość wariancji.
+
+### Wygenerowane animacje
+
+Do porównania wybrano 10 losowych elementów z wygenerowanych animacji, a następnie dobrano do nich najbardziej zbliżone elementy z testowego zbioru danych. Poniżej przedstawiono przykładowe pary animacji dla obu typów ruchu.
+
+#### Ruch walk
+
+Po lewej znajduje się element animacji typu `walk` ze zbioru testowego, a po prawej znajduje się generowany ruch. 
+
+<p align="center">
+  <img src="modeling/results/evaluation/test/walk_pair01_real_nn.gif" width="45%"  alt="Real Walk Animation 1"/>
+  <img src="modeling/results/evaluation/test/walk_pair01_generated.gif" width="45%" alt="Generated Walk Animation 1"/>
+</p>
+
+<p align="center">
+  <img src="modeling/results/evaluation/test/walk_pair02_real_nn.gif" width="45%"  alt="Real Walk Animation 2"/>
+  <img src="modeling/results/evaluation/test/walk_pair02_generated.gif" width="45%" alt="Generated Walk Animation 2"/>
+</p>
+
+<p align="center">
+  <img src="modeling/results/evaluation/test/walk_pair03_real_nn.gif" width="45%"  alt="Real Walk Animation 3"/>
+  <img src="modeling/results/evaluation/test/walk_pair03_generated.gif" width="45%" alt="Generated Walk Animation 3"/>
+</p>
+
+<p align="center">
+  <img src="modeling/results/evaluation/test/walk_pair04_real_nn.gif" width="45%"  alt="Real Walk Animation 4"/>
+  <img src="modeling/results/evaluation/test/walk_pair04_generated.gif" width="45%" alt="Generated Walk Animation 4"/>
+</p>
+
+<p align="center">
+  <img src="modeling/results/evaluation/test/walk_pair05_real_nn.gif" width="45%"  alt="Real Walk Animation 5"/>
+  <img src="modeling/results/evaluation/test/walk_pair05_generated.gif" width="45%" alt="Generated Walk Animation 5"/>
+</p>
+
+<p align="center">
+  <img src="modeling/results/evaluation/test/walk_pair06_real_nn.gif" width="45%"  alt="Real Walk Animation 6"/>
+  <img src="modeling/results/evaluation/test/walk_pair06_generated.gif" width="45%" alt="Generated Walk Animation 6"/>
+</p>
+
+<p align="center">
+  <img src="modeling/results/evaluation/test/walk_pair07_real_nn.gif" width="45%"  alt="Real Walk Animation 7"/>
+  <img src="modeling/results/evaluation/test/walk_pair07_generated.gif" width="45%" alt="Generated Walk Animation 7"/>
+</p>
+
+<p align="center">
+  <img src="modeling/results/evaluation/test/walk_pair08_real_nn.gif" width="45%"  alt="Real Walk Animation 8"/>
+  <img src="modeling/results/evaluation/test/walk_pair08_generated.gif" width="45%" alt="Generated Walk Animation 8"/>
+</p>
+
+<p align="center">
+  <img src="modeling/results/evaluation/test/walk_pair09_real_nn.gif" width="45%"  alt="Real Walk Animation 9"/>
+  <img src="modeling/results/evaluation/test/walk_pair09_generated.gif" width="45%" alt="Generated Walk Animation 9"/>
+</p>
+
+<p align="center">
+  <img src="modeling/results/evaluation/test/walk_pair10_real_nn.gif" width="45%"  alt="Real Walk Animation 10"/>
+  <img src="modeling/results/evaluation/test/walk_pair10_generated.gif" width="45%" alt="Generated Walk Animation 10"/>
+</p>
+
+#### Ruch jump
+
+Po lewej znajduje się element animacji typu `jump` ze zbioru testowego, a po prawej znajduje się generowany ruch. 
+
+<p align="center">
+  <img src="modeling/results/evaluation/test/jump_pair01_real_nn.gif" width="45%"  alt="Real Jump Animation 1"/>
+  <img src="modeling/results/evaluation/test/jump_pair01_generated.gif" width="45%" alt="Generated Jump Animation 1"/>
+</p>
+
+<p align="center">
+  <img src="modeling/results/evaluation/test/jump_pair02_real_nn.gif" width="45%"  alt="Real Jump Animation 2"/>
+  <img src="modeling/results/evaluation/test/jump_pair02_generated.gif" width="45%" alt="Generated Jump Animation 2"/>
+</p>
+
+<p align="center">
+  <img src="modeling/results/evaluation/test/jump_pair03_real_nn.gif" width="45%"  alt="Real Jump Animation 3"/>
+  <img src="modeling/results/evaluation/test/jump_pair03_generated.gif" width="45%" alt="Generated Jump Animation 3"/>
+</p>
+
+<p align="center">
+  <img src="modeling/results/evaluation/test/jump_pair04_real_nn.gif" width="45%"  alt="Real Jump Animation 4"/>
+  <img src="modeling/results/evaluation/test/jump_pair04_generated.gif" width="45%" alt="Generated Jump Animation 4"/>
+</p>
+
+<p align="center">
+  <img src="modeling/results/evaluation/test/jump_pair05_real_nn.gif" width="45%"  alt="Real Jump Animation 5"/>
+  <img src="modeling/results/evaluation/test/jump_pair05_generated.gif" width="45%" alt="Generated Jump Animation 5"/>
+</p>
+
+<p align="center">
+  <img src="modeling/results/evaluation/test/jump_pair06_real_nn.gif" width="45%"  alt="Real Jump Animation 6"/>
+  <img src="modeling/results/evaluation/test/jump_pair06_generated.gif" width="45%" alt="Generated Jump Animation 6"/>
+</p>
+
+<p align="center">
+  <img src="modeling/results/evaluation/test/jump_pair07_real_nn.gif" width="45%"  alt="Real Jump Animation 7"/>
+  <img src="modeling/results/evaluation/test/jump_pair07_generated.gif" width="45%" alt="Generated Jump Animation 7"/>
+</p>
+
+<p align="center">
+  <img src="modeling/results/evaluation/test/jump_pair08_real_nn.gif" width="45%"  alt="Real Jump Animation 8"/>
+  <img src="modeling/results/evaluation/test/jump_pair08_generated.gif" width="45%" alt="Generated Jump Animation 8"/>
+</p>
+
+<p align="center">
+  <img src="modeling/results/evaluation/test/jump_pair09_real_nn.gif" width="45%"  alt="Real Jump Animation 9"/>
+  <img src="modeling/results/evaluation/test/jump_pair09_generated.gif" width="45%" alt="Generated Jump Animation 9"/>
+</p>
+
+<p align="center">
+  <img src="modeling/results/evaluation/test/jump_pair10_real_nn.gif" width="45%"  alt="Real Jump Animation 10"/>
+  <img src="modeling/results/evaluation/test/jump_pair10_generated.gif" width="45%" alt="Generated Jump Animation 10"/>
+</p>
 
 ---
 
 ## Podsumowanie
 
-Przeprowadzona ewaluacja pokazuje, że model lepiej radzi sobie z generowaniem ruchu typu walk niż jump. Animacje chodu są bardziej realistyczne i bardziej zróżnicowane, co potwierdzają niższe wartości FMD oraz wyższa wariancja. Generowanie ruchu skoku okazało się bardziej wymagające, szczególnie pod względem zachowania realistycznej dynamiki ruchu. Mimo to uzyskane wartości MPJPE wskazują, że model poprawnie odwzorowuje pozycje stawów i potrafi generować spójne animacje szkieletowe.
+Uzyskane wyniki pokazują, że model skutecznie nauczył się danych treningowych, szczególnie dla ruchu typu walk. Niskie wartości FMD i MPJPE na zbiorze treningowym wskazują na dobrą jakość generowanych animacji oraz poprawne odwzorowanie pozycji stawów.
 
+Jednocześnie bardzo duży wzrost wartości metryk na zbiorze testowym sugeruje występowanie zjawiska przeuczenia (overfitting). Model dobrze zapamiętał dane treningowe, jednak gorzej radzi sobie z generowaniem ruchów dla nowych sekwencji niewidzianych podczas uczenia. Problem ten jest szczególnie widoczny dla metryki FMD, która silnie wzrosła dla obu typów ruchu.
+
+Możliwą przyczyną takiego zachowania jest stosunkowo niewielki zbiór testowy oraz ograniczona liczba danych treningowych, szczególnie dla bardziej złożonych ruchów.
