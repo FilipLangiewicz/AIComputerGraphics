@@ -11,7 +11,7 @@
 - [Project 2 - HDR Exposure Synthesis](#project-2--hdr-exposure-synthesis)
 - [Project 3 - Neural Rendering (Phong)](#project-3--neural-rendering-phong)
 - [Project 4 - 3D Point Cloud Transformation](#project-4--3d-point-cloud-transformation)
-- [Project 5 - TBD](#project-5--tbd)
+- [Project 5 - Stick Animation (Diffusion)](#project-5--Stick-Animation-(Diffusion))
 
 ---
 
@@ -168,6 +168,117 @@ All models achieve high IoU (>0.73) and Dice (>0.84). Notably, the armadillo mod
 
 ---
 
-## Project 5 - TBD
+## Project 5 - Stick Animation (Diffusion)
 
-> *Coming soon.*
+> Full report: [`project5/SUMMARY.md`](project5-stick-animation/SUMMARY.md)
+
+Goal: generate **stickman animations** from a text prompt specifying motion type using a **conditional diffusion model**. Two motion classes are supported: `walk` and `jump`. The model outputs a motion tensor of shape `[48, 15, 3]` — 48 animation frames, 15 skeleton keypoints, and 3 spatial coordinates per point.
+
+### Dataset & Preprocessing
+
+Motion sequences were stored as `.npy` files, split by class, and temporally resampled to a fixed 48-frame length. Each sequence was spatially centred relative to mean body-centre joint positions to decouple absolute location from motion dynamics. Training data was augmented with random vertical-axis rotation and optional skeleton mirroring — 7 augmentation variants for `walk`, 13 for `jump` to balance the classes. Final splits: `train.npz`, `test.npz`, and `norm_stats.npy`.
+
+### MotionDenoiser Architecture
+
+The generative model (`MotionDenoiser`) is a **Transformer-based diffusion denoiser** conditioned on motion class. It predicts the noise added to a motion sequence at a given diffusion step.
+
+| Component | Description |
+|-----------|-------------|
+| Input projection | Linear layer mapping 15 joints → model hidden dim |
+| Time embedding | Sinusoidal + MLP |
+| Class embedding | Learned embedding for `walk` / `jump` |
+| Backbone | Transformer encoder (temporal self-attention) |
+| Output head | Linear projection → `[48, 15, 3]` displacements |
+
+Key hyperparameters: model dim `384`, attention heads `6`, transformer layers `6`, dropout `0.1`.
+
+### Diffusion Process
+
+Standard **Gaussian Diffusion** with a linear `beta` schedule over 1 000 steps. The forward process gradually corrupts motion sequences with Gaussian noise; the reverse process denoises iteratively to recover the animation. **Classifier-free guidance** is applied — class labels are randomly dropped during training, and generation uses a `guidance_scale` parameter to control conditioning strength.
+
+### Training
+
+| Parameter | Value |
+|-----------|-------|
+| Optimizer | AdamW |
+| Learning rate | 1e-4 |
+| Scheduler | CosineAnnealingLR |
+| Batch size | 32 |
+| Diffusion steps | 1 000 |
+| Gradient clipping | 1.0 |
+| Velocity loss weight | 0.1 |
+
+Training ran for 5 000 epochs (phase 1, interrupted due to memory limits) followed by a fine-tuning phase. The final checkpoint from epoch **4 200** (phase 2) achieved the lowest loss and best qualitative results. Loss started at ~1.4979 and decreased systematically throughout training.
+
+### Loss Function
+
+total_loss = noise_loss + 0.1 · velocity_loss
+
+`noise_loss` is the standard MSE between predicted and actual noise. `velocity_loss` penalises differences in joint velocity between consecutive frames, promoting temporal smoothness and natural motion dynamics.
+
+### Evaluation Metrics
+
+Quantitative evaluation used three metrics: **FMD** (Fréchet Motion Distance — distribution-level quality), **MPJPE** (Mean Per Joint Position Error — joint accuracy), and **Var** (variance across generated samples — diversity).
+
+#### Training Set
+
+| Motion | FMD ↓     | MPJPE ↓ | Var ↑  | Samples |
+|:------:|----------:|--------:|-------:|--------:|
+| *walk* | 31.03     | 2.71    | 9.50   | 623     |
+| *jump* | 139.76    | 2.09    | 3.40   | 637     |
+
+#### Test Set
+
+| Motion | FMD ↓      | MPJPE ↓ | Var ↑  | Samples |
+|:------:|----------:|--------:|-------:|--------:|
+| *walk* | 2596.04   | 10.52   | 8.68   | 23      |
+| *jump* | 882.17    | 7.19    | 3.59   | 12      |
+
+The model achieves low FMD and MPJPE on the training set, especially for `walk`. The large increase on the test set indicates overfitting, likely due to the small test set size and limited training data for more complex motions. Variance remained stable across both splits, confirming diverse generation without mode collapse.
+
+### Generated Animations — Jump
+
+<table>
+<tr>
+  <td><img src="project5-stick-animation/modeling/results/jump/jump_s1.gif" width="200"></td>
+  <td><img src="project5-stick-animation/modeling/results/jump/jump_s2.gif" width="200"></td>
+  <td><img src="project5-stick-animation/modeling/results/jump/jump_s3.gif" width="200"></td>
+  <td><img src="project5-stick-animation/modeling/results/jump/jump_s4.gif" width="200"></td>
+</tr>
+<tr>
+  <td><img src="project5-stick-animation/modeling/results/jump/jump_s5.gif" width="200"></td>
+  <td><img src="project5-stick-animation/modeling/results/jump/jump_s6.gif" width="200"></td>
+  <td><img src="project5-stick-animation/modeling/results/jump/jump_s7.gif" width="200"></td>
+  <td><img src="project5-stick-animation/modeling/results/jump/jump_s8.gif" width="200"></td>
+</tr>
+<tr>
+  <td><img src="project5-stick-animation/modeling/results/jump/jump_s9.gif" width="200"></td>
+  <td><img src="project5-stick-animation/modeling/results/jump/jump_s10.gif" width="200"></td>
+  <td><img src="project5-stick-animation/modeling/results/jump/jump_s11.gif" width="200"></td>
+  <td><img src="project5-stick-animation/modeling/results/jump/jump_s12.gif" width="200"></td>
+</tr>
+</table>
+
+### Generated Animations — Walk
+
+<table>
+<tr>
+  <td><img src="project5-stick-animation/modeling/results/walk/walk_s1.gif" width="200"></td>
+  <td><img src="project5-stick-animation/modeling/results/walk/walk_s2.gif" width="200"></td>
+  <td><img src="project5-stick-animation/modeling/results/walk/walk_s3.gif" width="200"></td>
+  <td><img src="project5-stick-animation/modeling/results/walk/walk_s4.gif" width="200"></td>
+</tr>
+<tr>
+  <td><img src="project5-stick-animation/modeling/results/walk/walk_s5.gif" width="200"></td>
+  <td><img src="project5-stick-animation/modeling/results/walk/walk_s6.gif" width="200"></td>
+  <td><img src="project5-stick-animation/modeling/results/walk/walk_s7.gif" width="200"></td>
+  <td><img src="project5-stick-animation/modeling/results/walk/walk_s8.gif" width="200"></td>
+</tr>
+<tr>
+  <td><img src="project5-stick-animation/modeling/results/walk/walk_s9.gif" width="200"></td>
+  <td><img src="project5-stick-animation/modeling/results/walk/walk_s10.gif" width="200"></td>
+  <td><img src="project5-stick-animation/modeling/results/walk/walk_s11.gif" width="200"></td>
+  <td><img src="project5-stick-animation/modeling/results/walk/walk_s12.gif" width="200"></td>
+</tr>
+</table>
+
